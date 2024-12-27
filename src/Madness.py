@@ -1,10 +1,10 @@
-from matplotlib.backends.backend_webagg import webagg_server_thread
+from src.bracket import BaseGame
+from src.bracket import Sentinel
+from src.bracket import Team
+from src.bracket import UpperGame
+from src.model import LogisticRegression
 
-from src.bracket.BaseGame import BaseGame
-from src.bracket.Sentinel import Sentinel
-from src.bracket.Team import Team
-from src.bracket.UpperGame import UpperGame
-from src.model.MMLogisticRegression import MMLogisticRegression
+# using seeding predictions from ESPN bracketology as of 12/24/24
 
 # init teams
 
@@ -109,8 +109,8 @@ east172 = Team("North Carolina", 10)
 east181 = Team("Alabama", 2)
 east182 = Team("Norfolk St.", 15)
 
-# init model
-model = MMLogisticRegression('http://barttorvik.com/getgamestats.php?year=2025&csv=1')
+# init model and train
+model = LogisticRegression(2025)
 model.train()
 
 # init games
@@ -233,10 +233,11 @@ right = UpperGame(model, 5, midwest41, east41)
 championship = UpperGame(model, 6, left, right)
 
 # init sentinel
-sentinel = Sentinel(model, -1, championship)
+sentinel = Sentinel(championship)
 
-for game in sentinel.get_games():
-    print("Round:",game.get_round())
-    probs = game.get_probs()
-    for team in probs.keys():
-        print(team.get_name(), probs[team])
+# get expected vals
+for game in championship.get_games():
+    print("Round: ", game.get_round)
+    evs = game.get_expected_values()
+    for team in evs.keys():
+        print(team.get_name, evs[team])
