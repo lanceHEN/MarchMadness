@@ -41,7 +41,7 @@ pip install numpy pandas
 1. **Train the Model**:
    Train the logistic regression model using historical game data:
    ```python
-   from model import LogisticRegression
+   from src/model import LogisticRegression
    model = LogisticRegression(2025)
    model.train()
    ```
@@ -67,7 +67,3 @@ pip install numpy pandas
 
 ## Contributions
 Contributions are welcome! Feel free to submit issues or pull requests to enhance the functionality or accuracy of the models.
-
----
-Happy predicting and good luck with your brackets!
-
