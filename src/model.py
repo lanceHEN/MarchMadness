@@ -119,6 +119,7 @@ class Model(ABC):
         X = df[features].to_numpy()
         y = df['Win'].to_numpy()
         self._y = np.reshape(y,(-1,1))
+        # perform LDA, projecting onto 1 dimension
         X1 = X[y.flatten()==1]
         X0 = X[y.flatten()==0]
         u = np.reshape(np.mean(X0, axis=0) - np.mean(X1, axis=0), (X.shape[1],1))
