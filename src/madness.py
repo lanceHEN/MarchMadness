@@ -10,104 +10,104 @@ from src.model import LogisticRegression
 
 # south
 south111 = Team("Auburn", 1)
-south112 = Team("Southern", 16)
+south112 = Team("Merrimack", 16)
 
-south121 = Team("Clemson", 8)
-south122 = Team("West Virginia", 9)
+south121 = Team("North Carolina", 8)
+south122 = Team("Michigan", 9)
 
-south131 = Team("Memphis", 5)
-south132 = Team("Furman", 12)
+south131 = Team("Dayton", 5)
+south132 = Team("Liberty", 12)
 
-south141 = Team("Texas A&M", 4)
-south142 = Team("High Point", 13)
+south141 = Team("West Virginia", 4)
+south142 = Team("Arkansas St.", 13)
 
-south151 = Team("Mississippi", 6)
+south151 = Team("UCLA", 6)
 south152 = Team("Drake", 11)
 
-south161 = Team("Oregon", 3)
-south162 = Team("UMass Lowell", 14)
+south161 = Team("Alabama", 3)
+south162 = Team("Elon", 14)
 
-south171 = Team("Michigan", 7)
-south172 = Team("Utah St.", 10)
+south171 = Team("Michigan St.", 7)
+south172 = Team("Missouri", 10)
 
-south181 = Team("Kentucky", 2)
-south182 = Team("Montana", 15)
+south181 = Team("Marquette", 2)
+south182 = Team("Milwaukee", 15)
 
 # west
 west111 = Team("Duke", 1)
-west112 = Team("Youngstown St.", 16)
+west112 = Team("Little Rock", 16)
 
-west121 = Team("Georgia", 8)
-west122 = Team("Texas Tech", 9)
+west121 = Team("Maryland", 8)
+west122 = Team("Arkansas", 9)
 
-west131 = Team("Oklahoma", 5)
-west132 = Team("UC San Diego", 12)
+west131 = Team("Mississippi St.", 5)
+west132 = Team("Utah St.", 12)
 
-west141 = Team("Houston", 4)
-west142 = Team("Grand Canyon", 13)
+west141 = Team("Gonzaga", 4)
+west142 = Team("North Dakota St.", 13)
 
-west151 = Team("Illinois", 6)
-west152 = Team("Arizona St.", 11)
+west151 = Team("Baylor", 6)
+west152 = Team("Ohio St.", 11)
 
-west161 = Team("Gonzaga", 3)
-west162 = Team("Central Connecticut", 14)
+west161 = Team("Texas A&M", 3)
+west162 = Team("Grand Canyon", 14)
 
-west171 = Team("St. John's", 7)
-west172 = Team("Penn St.", 10)
+west171 = Team("Arizona St.", 7)
+west172 = Team("Wisconsin", 10)
 
-west181 = Team("Florida", 2)
-west182 = Team("Indiana St.", 15)
+west181 = Team("Oregon", 2)
+west182 = Team("Montana St.", 15)
 
 #midwest
 midwest111 = Team("Tennessee", 1)
-midwest112 = Team("Lamar", 16)
+midwest112 = Team("Southern", 16)
 
-midwest121 = Team("Dayton", 8)
-midwest122 = Team("San Diego St.", 9)
+midwest121 = Team("Colorado", 8)
+midwest122 = Team("Louisville", 9)
 
-midwest131 = Team("Purdue", 5)
-midwest132 = Team("Arkansas St.", 12)
+midwest131 = Team("Connecticut", 5)
+midwest132 = Team("UC Irvine", 12)
 
-midwest141 = Team("Mississippi St.", 4)
-midwest142 = Team("Lipscomb", 13)
+midwest141 = Team("Memphis", 4)
+midwest142 = Team("Columbia", 13)
 
-midwest151 = Team("Pittsburgh", 6)
-midwest152 = Team("Ohio St.", 11)
+midwest151 = Team("Clemson", 6)
+midwest152 = Team("Northwestern", 11)
 
-midwest161 = Team("Kansas", 3)
-midwest162 = Team("South Dakota St.", 14)
+midwest161 = Team("Florida", 3)
+midwest162 = Team("Central Connecticut", 14)
 
-midwest171 = Team("Cincinnati", 7)
-midwest172 = Team("Texas", 10)
+midwest171 = Team("San Diego St.", 7)
+midwest172 = Team("Nebraska", 10)
 
-midwest181 = Team("Marquette", 2)
-midwest182 = Team("Merrimack", 15)
+midwest181 = Team("Kansas", 2)
+midwest182 = Team("Lipscomb", 15)
 
 #east
 
 east111 = Team("Iowa St.", 1)
-east112 = Team("Hampton", 16)
+east112 = Team("Bryant", 16)
 
-east121 = Team("Wisconsin", 8)
-east122 = Team("Arkansas", 9)
+east121 = Team("Illinois", 8)
+east122 = Team("Mississippi", 9)
 
-east131 = Team("Michigan St.", 5)
-east132 = Team("Liberty", 12)
+east131 = Team("Pittsburgh", 5)
+east132 = Team("Furman", 12)
 
-east141 = Team("UCLA", 4)
-east142 = Team("Kent St.", 13)
+east141 = Team("Oklahoma", 4)
+east142 = Team("McNeese St.", 13)
 
-east151 = Team("Baylor", 6)
-east152 = Team("Missouri", 11)
+east151 = Team("Georgia", 6)
+east152 = Team("UCF", 11)
 
-east161 = Team("Connecticut", 3)
-east162 = Team("Princeton", 14)
+east161 = Team("Purdue", 3)
+east162 = Team("Kent St.", 14)
 
-east171 = Team("Maryland", 7)
-east172 = Team("North Carolina", 10)
+east171 = Team("Houston", 7)
+east172 = Team("Penn St.", 10)
 
-east181 = Team("Alabama", 2)
-east182 = Team("Norfolk St.", 15)
+east181 = Team("Kentucky", 2)
+east182 = Team("High Point", 15)
 
 # init model and train
 model = LogisticRegression(2025)
@@ -236,8 +236,16 @@ championship = UpperGame(model, 6, left, right)
 sentinel = Sentinel(championship)
 
 # get expected vals
-for game in championship.get_games():
-    print("Round: ", game.get_round)
-    evs = game.get_expected_values()
-    for team in evs.keys():
-        print(team.get_name, evs[team])
+games = championship.get_games()
+winners = {}
+for round in games.keys():
+    winners[round] = []
+    for game in games[round]:
+        i = -1
+        while round != 1 and not list(game.get_expected_values().keys())[i].get_name in winners[round - 1]:
+            i -= 1
+        winners[round].append(list(game.get_expected_values().keys())[i].get_name)
+
+for round in winners.keys():
+    print("Round: {}".format(round))
+    print("Winners: {}".format(winners[round]))
