@@ -67,3 +67,9 @@ pip install numpy pandas
 
 ## Contributions
 Contributions are welcome! Feel free to submit issues or pull requests to enhance the functionality or accuracy of the models.
+
+## Data Sources
+This project uses data from [Bart Torvik's amazing rankings and metrics page](https://barttorvik.com/#)
+
+## License
+This project is licensed under the MIT License. See the LICENSE file for details.
