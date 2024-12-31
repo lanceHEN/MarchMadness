@@ -49,7 +49,7 @@ class Team:
         __seed: Integer representing the team seed.
     """
 
-    def __init__(self, name, seed):
+    def __init__(self, name: str, seed: int):
         """
         Constructs a Team object with the given name and seed.
 
@@ -58,20 +58,15 @@ class Team:
             seed (int): The seed of the Team (between 1 and 16).
 
         Raises:
-            TypeError: If the given name is not a string or the given seed is not an integer.
             ValueError: If the given seed is not between 1 and 16.
         """
-        if not isinstance(name, str):
-            raise TypeError("Name must be a string")
-        if not isinstance(seed, int):
-            raise TypeError("Seed must be an integer")
         if seed < 1 or seed > 16:
             raise ValueError("Seed must be between 1 and 16")
         self.__name = name
         self.__seed = seed
 
     @property
-    def get_name(self):
+    def get_name(self) -> str:
         """
         Produces the name of the Team as a string.
 
@@ -81,7 +76,7 @@ class Team:
         return self.__name
 
     @property
-    def get_seed(self):
+    def get_seed(self) -> int:
         """
         Produces the seed of the Team as an integer.
 
@@ -90,7 +85,7 @@ class Team:
         """
         return self.__seed
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         """
         Determines if this Team equals the given object. Two Teams are equal iff they have the same name and seed.
 
@@ -104,7 +99,7 @@ class Team:
             return False
         return self.__name == other.get_name and self.__seed == other.get_seed
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         """
         Produces a hash value for this Team, using its name and seed.
 
@@ -133,7 +128,7 @@ class Game(ABC):
         duplicate computations.
     """
 
-    def __init__(self, model, round):
+    def __init__(self, model: Model, round: int):
         """
         Constructs a Game object with the give model and round.
 
@@ -142,13 +137,8 @@ class Game(ABC):
             round (int): The round of the game.
 
         Raises:
-            TypeError: If model is not a Model object or round is not an int.
             ValueError: If round is not a positive integer.
         """
-        if not isinstance(model, Model):
-            raise TypeError('model is not a Model object')
-        if not isinstance(round, int):
-            raise TypeError('round is not an integer')
         if round <= 0:
             raise ValueError('round must be a positive integer')
         self._model = model
@@ -157,7 +147,7 @@ class Game(ABC):
         self._cached_probs = None
         self._cached_expected_vals = None
 
-    def _add_parent(self, parent):
+    def _add_parent(self, parent: 'Game') -> None:
         """
         Adds the given Game object as the parent to this Game object.
 
@@ -166,19 +156,16 @@ class Game(ABC):
 
         Raises:
             RuntimeError: If this Game object already has a parent.
-            TypeError: If parent is not a Game object.
             TypeError: If parent is a BaseGame object.
         """
         if self._parent is not None:
             raise RuntimeError('Game already has a parent')
-        if not isinstance(parent, Game):
-            raise TypeError('parent is not a Game object')
         if isinstance(parent, BaseGame):
             raise TypeError('parent cannot be a BaseGame object')
         self._parent = parent
 
     @abstractmethod
-    def get_probs(self):
+    def get_probs(self) -> dict[Team, float]:
         """
         Determines the probability of each possible team in this Game winning this game and any previous games, producing
         a dict from such teams to their probabilities.
@@ -192,7 +179,7 @@ class Game(ABC):
         """
         pass
 
-    def get_expected_values(self):
+    def get_expected_values(self) -> dict[Team, float]:
         """
         Determines the expected points for each possible team in this Game and any later games in higher rounds, producing a dict
         from teams to their expected points. Expected points for a team are calculated by multiplying the probability of
@@ -219,7 +206,7 @@ class Game(ABC):
         self._cached_expected_vals = probs_map
         return probs_map
 
-    def _check_has_parent(self):
+    def _check_has_parent(self) -> None:
         """
         Determines if this Game object does not have a parent, throwing a RuntimeError if so.
 
@@ -230,19 +217,19 @@ class Game(ABC):
             raise RuntimeError("Parent is not defined")
 
     @abstractmethod
-    def get_games(self):
+    def get_games(self) -> dict[int, list['Game']]:
         """
-        Produces a list of all Games contained in this Game, including this game itself. The list is produced in an inorder
-        traversal fashion.
+        Produces a dict from round to its corresponding Games, for each Game contained in this Game object
+         (including itself).
 
         Returns:
-            list: a list of all Games contained in this Game, including this game itself. The list is produced in an inorder
-            traversal fashion.
+            dict: a dict from round to its corresponding Games, for each Game contained in this Game object
+            (including itself).
         """
         pass
 
     @abstractmethod
-    def get_teams(self):
+    def get_teams(self) -> list[Team]:
         """
         Produces a list of all teams contained in this Game. The list is produced in order, with the leftmost team first
         and the rightmost team last, where leftmost corresponds to the first team in the base game and rightmost corrsponds
@@ -254,7 +241,7 @@ class Game(ABC):
         pass
 
     @property
-    def get_round(self):
+    def get_round(self) -> int:
         """
         Produces the round of this Game.
 
@@ -264,7 +251,7 @@ class Game(ABC):
         return self._round
 
     @staticmethod
-    def _sort_dict(dictionary):
+    def _sort_dict(dictionary: dict) -> dict:
         """
         Given a dict, produces a sorted version in ascending order.
 
@@ -298,7 +285,7 @@ class BaseGame(Game):
         __team2: The second team in this BaseGame.
     """
 
-    def __init__(self, model, round, team1, team2):
+    def __init__(self, model: Model, round: int, team1: Team, team2: Team):
         """
         Constructs a BaseGame object with the given model, round, first team, and second team. Note that round may be
         specified for brackets that are not "full", but have unique shapes.
@@ -309,18 +296,13 @@ class BaseGame(Game):
             team2 (Team): The second team of this BaseGame.
 
         Raises:
-            TypeError: If model is not a Model object or team1 is not a Team or team2 is not a Team.
             ValueError if round <= 0
         """
         super().__init__(model, round)
-        if not isinstance(team1, Team):
-            raise TypeError('team1 must be an instance of Team')
-        if not isinstance(team2, Team):
-            raise TypeError('team2 must be an instance of Team')
         self.__team1 = team1
         self.__team2 = team2
 
-    def get_probs(self):
+    def get_probs(self) -> dict[Team, float]:
         self._check_has_parent()
         if self._cached_probs is not None:
             return self._cached_probs
@@ -330,10 +312,10 @@ class BaseGame(Game):
         self._cached_probs = self._sort_dict({self.__team1: team_1_prediction, self.__team2: team_2_prediction})
         return self._cached_probs
 
-    def get_games(self):
-        return [self]
+    def get_games(self) -> dict[int, Game]:
+        return {self._round: [self]}
 
-    def get_teams(self):
+    def get_teams(self) -> list[Team]:
         return [self.__team1, self.__team2]
 
 class UpperGame(Game):
@@ -353,7 +335,7 @@ class UpperGame(Game):
         __game2: The second game in this UpperGame.
     """
 
-    def __init__(self, model, round, game1, game2):
+    def __init__(self, model: Model, round: int, game1: Game, game2: Game):
         """
         Constructs an UpperGame object with the given model, first game, and second game.
 
@@ -363,20 +345,15 @@ class UpperGame(Game):
         game2 (Team): The second game of this UpperGame.
 
         Raises:
-        TypeError: If model is not a Model object or game1 is not a Game or game2 is not a Game.
         RuntimeError: If round <= 0
         """
         super().__init__(model, round)
-        if not isinstance(game1, Game):
-            raise TypeError("game1 must be an instance of Game")
-        if not isinstance(game2, Game):
-            raise TypeError("game2 must be an instance of Game")
         self.__game1 = game1
         self.__game2 = game2
         self.__game1._add_parent(self)
         self.__game2._add_parent(self)
 
-    def get_probs(self):
+    def get_probs(self) -> dict[Team, float]:
         self._check_has_parent()
         if self._cached_probs is not None:
             return self._cached_probs
@@ -405,10 +382,15 @@ class UpperGame(Game):
         self._cached_probs = probs_map
         return probs_map
 
-    def get_games(self):
-        return self.__game1.get_games() + [self] + self.__game2.get_games()
+    def get_games(self) -> dict[int, Game]:
+        games = self.__game1.get_games()
+        games2 = self.__game2.get_games()
+        for round in games.keys():
+            games[round] += games2[round]
+        games[self._round] = [self]
+        return games
 
-    def get_teams(self):
+    def get_teams(self) -> list[Team]:
         return self.__game1.get_teams() + self.__game2.get_teams()
 
 class Sentinel(Game):
@@ -428,41 +410,36 @@ class Sentinel(Game):
         __game: the championship Game of the tournament.
     """
 
-    def __init__(self, game):
+    def __init__(self, game: Game):
         """
         Constructs a Sentinel object with the given Game.
 
         Args:
             game (Game): the championship Game (root) of the bracket.
-
-        Raises:
-            TypeError: if game is not a Game.
         """
         # NOTE: super deliberately not called because model and round are useless for sentinels and don't need
         # to be initialized
-        if not isinstance(game, Game):
-            raise TypeError("game must be an instance of Game")
         self.__game = game
         self.__game._add_parent(self)
 
     # raises a RuntimeError because Sentinels cannot have parents
-    def _add_parent(self, parent):
+    def _add_parent(self, parent: Game) -> None:
         raise RuntimeError("Cannot add parent to sentinel")
 
     # simply raises a RuntimeError because Sentinels cannot calculate probabilities
-    def get_probs(self):
+    def get_probs(self) -> dict[Team, float]:
         raise RuntimeError("Cannot calculate probs for sentinel")
 
     # simply produces a dict from each team in the sentinel to 0, which is useful for acting as a stopping point for
     # get_expected_values calculations in canonical games
-    def get_expected_values(self):
+    def get_expected_values(self) -> dict[Team, float]:
         values_dict = dict.fromkeys(self.get_teams(), 0)
         return values_dict
 
     # produces all games in this Sentinel, not including this Sentinel.
-    def get_games(self):
+    def get_games(self) -> dict[int, Game]:
         return self.__game.get_games()
 
     # produces all teams in this Sentinel.
-    def get_teams(self):
+    def get_teams(self) -> list[Team]:
         return self.__game.get_teams()

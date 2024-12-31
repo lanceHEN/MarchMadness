@@ -47,7 +47,7 @@ class Model(ABC):
         _y: one dimensional numpy array of labels for each sample (1: the given team won, 0: they lost).
     """
 
-    def __init__(self, year):
+    def __init__(self, year: int):
         """
         Constructs a model using barttorvik.com data for the given year.
 
@@ -55,11 +55,8 @@ class Model(ABC):
             year (int): The year to draw data from.
 
         Raises:
-            TypeError: If year is not an integer
             ValueError: If year is not a positive integer between 2008 and the current year, inclusive.
         """
-        if not isinstance(year, int):
-            raise TypeError('The year must be an integer')
         try:
             url = 'https://barttorvik.com/getgamestats.php?year=' + str(year) + '&csv=1'
         except:
@@ -135,7 +132,7 @@ class Model(ABC):
         self._alphas = np.real(alphas)
 
     @abstractmethod
-    def train(self):
+    def train(self) -> None:
         """
         EFFECT: Trains this model with the data given to it on construction.
 
@@ -144,7 +141,7 @@ class Model(ABC):
         """
         pass
 
-    def _compute_rolling_average(self, team, window=10):
+    def _compute_rolling_average(self, team: str, window=10) -> dict[str, float]:
         """
         Computes the rolling average stats for a given team from the last 10 games, as a dict from the name of the stat to
         its corresponding value, where each stat is named 'Team_{stat}_avg'.
@@ -178,7 +175,7 @@ class Model(ABC):
         return rolling_avg
 
     @abstractmethod
-    def predict(self, team1, team2, venue):
+    def predict(self, team1: str, team2: str, venue: str) -> np.ndarray:
         """
         Produces the probabilities of team1 and team2 winning a matchup at a given venue, as a 1-d numpy array where arr[1]
         is the probability of team1 winning and team2 losing, and arr[0] is the probability of team1 losing and team2
@@ -190,7 +187,7 @@ class Model(ABC):
             venue (str): the venue of the matchup (must be 'H' for team 1 home, 'N' for neutral, and 'A' for team 1 away).
 
         Returns:
-            numpy array: a 1-d numpy array where arr[1]
+            np.ndarray: a 1-d numpy array where arr[1]
             is the probability of team1 winning and team2 losing, and arr[0] is the probability of team1 losing and team2
             winning.
 
@@ -214,7 +211,7 @@ class LogisticRegression(Model):
         _y: one dimensional numpy array of labels for each sample (1: the given team won, 0: they lost).
     """
 
-    def __init__(self, year):
+    def __init__(self, year: int):
         """
         Constructs a MMLogisticRegression object with the given year to obtain data from.
 
@@ -228,7 +225,7 @@ class LogisticRegression(Model):
         super().__init__(year)
         self.__w = None
 
-    def train(self):
+    def train(self) -> None:
         if self.__w is not None:
             raise RuntimeError("Model has already been trained!")
         print("Training model, this may take a while...")
@@ -247,7 +244,7 @@ class LogisticRegression(Model):
             return (1/n) * sum + lambda_ * 2 * w # add ridge regularizer
 
         step = 0.001
-        iterations = 30000
+        iterations = 10000
 
         for iteration in range(iterations):
             u = dl_l2(w)
@@ -257,7 +254,7 @@ class LogisticRegression(Model):
         print("Model trained!")
 
     @staticmethod
-    def __sigmoid(phi_lower, w):
+    def __sigmoid(phi_lower: np.ndarray, w: np.ndarray) -> float:
         """
         Computes the sigmoid activation function, which maps input values to the range (0, 1), representing their probability of success.
 
@@ -270,15 +267,9 @@ class LogisticRegression(Model):
         """
         return 1/(1 + np.exp((-phi_lower.T.dot(w)).item()))
 
-    def predict(self, team1, team2, venue):
+    def predict(self, team1: str, team2: str, venue: str) -> np.ndarray:
         if self.__w is None:
             raise RuntimeError("Model has not been trained!")
-        if not isinstance(team1, str):
-            raise TypeError("team1 must be a string.")
-        if not isinstance(team2, str):
-            raise TypeError("team2 must be a string.")
-        if not isinstance(venue, str):
-            raise TypeError("venue must be a string.")
         if venue not in self._ven_map.keys():
             raise ValueError("venue must be one of the following strings: 'H', 'N', and 'A'.")
 
