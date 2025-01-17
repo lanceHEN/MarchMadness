@@ -26,6 +26,10 @@ This module defines machine learning models to predict game outcomes based on hi
 - **Feature Engineering**: Computes rolling averages and differentials for team stats to enhance predictive accuracy.
 - **Data Pipeline**: Loads and preprocesses data from Barttorvik.com, including adjustments for venue and statistical comparisons.
 
+### 4. 'preprocess.py'
+This module defines a function ```get_data``` to create a pandas dataframe and corresponding X and y NumPy array for
+games scraped from barttorvik.com for a given season.
+
 ## Usage
 ### Dependencies
 This project relies on the following Python libraries:

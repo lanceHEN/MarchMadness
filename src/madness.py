@@ -110,9 +110,9 @@ east181 = Team("Kentucky", 2)
 east182 = Team("High Point", 15)
 
 # init model and train
-model = MLP(2025, n_hidden=2, lr=0.00001, width_hidden=16)
-model.train()
-print("Accuracy for 2023 season:",model.accuracy(year=2023))
+model = MLP(2024, n_hidden=2, lr=0.00001, width_hidden=32)
+model.train(epochs=30000)
+print("Accuracy for 2024 season:",model.accuracy(year=2024))
 
 # init games
 # south
@@ -243,10 +243,10 @@ for round in games.keys():
     winners[round] = []
     for game in games[round]:
         i = -1
-        probs = game.get_probs()
-        while round != 1 and not list(probs.keys())[i].get_name in winners[round - 1]:
+        evs = game.get_expected_values()
+        while round != 1 and not list(evs.keys())[i].get_name in winners[round - 1]:
             i -= 1
-        winners[round].append(list(probs.keys())[i].get_name)
+        winners[round].append(list(evs.keys())[i].get_name)
 
 for round in winners.keys():
     print("Round: {}".format(round))
