@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 import numpy as np
 import pandas as pd
+from keras.src.backend.jax.nn import sigmoid
 from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
 
@@ -57,6 +58,15 @@ class Model(ABC):
         Raises:
             ValueError: If year is not a positive integer between 2008 and the current year, inclusive.
         """
+        self._res_map = {'W':1, 'L':0}
+        self._ven_map = {'H':1, 'N':0, 'A':-1}
+        self._stats_columns = ['AdjO', 'AdjD', 'OffEfg%', 'OffTo%', 'OffReb%', 'OffFTR', 'DefEfg%', 'DefTo%', 'DefReb%', 'DefFTR']
+        self._df, self._X, self._y = self._get_data(year)
+        self._vhat = self._get_vhat(self._X, self._y)
+        self._alphas = self._project(self._X)
+        self._w = None
+
+    def _get_data(self, year):
         try:
             url = 'https://barttorvik.com/getgamestats.php?year=' + str(year) + '&csv=1'
         except:
@@ -81,41 +91,41 @@ class Model(ABC):
         df.insert(6, 'Home Score', result_split[1].astype(int))
         df.insert(6, 'Win', result_split[0])
         # convert result to binary: 1 for W, 0 for L
-        self._res_map = {'W':1, 'L':0}
         df['Win'] = df['Win'].apply(lambda x: self._res_map[x])
         # convert venue to numerical: 1 for H, 0 for N, -1 for A
-        self._ven_map = {'H':1, 'N':0, 'A':-1}
         df['Venue'] = df['Venue'].apply(lambda x: self._ven_map[x])
         # get rolling averages
-        self.stats_columns = ['AdjO', 'AdjD', 'OffEfg%', 'OffTo%', 'OffReb%', 'OffFTR', 'DefEfg%', 'DefTo%', 'DefReb%', 'DefFTR']
         num_games = 10
-        for stat in self.stats_columns:
+        for stat in self._stats_columns:
             df[f'Team_{stat}_avg'] = (
                 df.groupby('Team')[stat]
                 .rolling(num_games, min_periods=1)
                 .mean()
                 .shift(1)  # Exclude the current game
                 .reset_index(level=0, drop=True)
-        )
+            )
         # Compute rolling averages for the opponent
-        for stat in self.stats_columns:
+        for stat in self._stats_columns:
             df[f'Opponent_{stat}_avg'] = (
                 df.groupby('Opp')[stat]
                 .rolling(5, min_periods=1)
                 .mean()
                 .shift(1)  # Exclude the current game
                 .reset_index(level=0, drop=True)
-        )
+            )
         df.dropna(inplace=True)
         # get stat differentials
-        for stat in self.stats_columns:
+        for stat in self._stats_columns:
             df[f'{stat}_diff'] = df[f'Team_{stat}_avg'] - df[f'Opponent_{stat}_avg']
-        self._df = df
         features = ['Venue', 'AdjO_diff', 'AdjD_diff', 'OffEfg%_diff', 'OffTo%_diff', 'OffReb%_diff', 'OffFTR_diff',
                     'DefEfg%_diff', 'DefTo%_diff', 'DefReb%_diff', 'DefFTR_diff']
         X = df[features].to_numpy()
         y = df['Win'].to_numpy()
-        self._y = np.reshape(y,(-1,1))
+        y = np.reshape(y,(-1,1))
+
+        return df, X, y
+
+    def _get_vhat(self, X, y):
         # perform LDA, projecting onto 1 dimension
         X1 = X[y.flatten()==1]
         X0 = X[y.flatten()==0]
@@ -125,19 +135,43 @@ class Model(ABC):
         C1 = np.eye(X1.shape[0]) - 1/X1.shape[0] * np.ones((X1.shape[0],X1.shape[0]))
         S2 = X0.T.dot(C0.dot(X0)) + X1.T.dot(C1.dot(X1))
         Q = np.linalg.inv(S2).dot(S1)
+        #print(np.linalg.eig(Q))
         most_important_idx = np.argmax(np.linalg.eig(Q)[0])
-        self.vhat = np.reshape(np.linalg.eig(Q)[1][:,most_important_idx],(-1,1))
+        vhat = np.reshape(np.linalg.eig(Q)[1][:,most_important_idx],(-1,1))
+        return vhat
+
+    def _project(self, X):
         #project data
-        alphas = X.dot(self.vhat)
-        self._alphas = np.real(alphas)
+        alphas = X.dot(self._vhat)
+        alphas = np.real(alphas)
+        return alphas
 
     @abstractmethod
-    def train(self) -> None:
+    def train(self, epochs=10000) -> None:
         """
         EFFECT: Trains this model with the data given to it on construction.
 
+        Parameters:
+            epochs (int): Number of iterations to train for
+
         Raises:
             RuntimeError: If this model has already been trained.
+        """
+        pass
+
+    @abstractmethod
+    def accuracy(self, year: int) -> float:
+        """
+        Produces the percentage of correctly predicted games using data for the given year, as a float between 0 and 1.
+
+        Args:
+            year (int): The year to determine accuracy for.
+
+        Returns:
+            float: the percentage of correctly predicted games for the given year.
+
+        Raises:
+            ValueError: If year is not a positive integer between 2008 and the current year, inclusive.
         """
         pass
 
@@ -169,7 +203,7 @@ class Model(ABC):
             raise ValueError('Window must be positive')
         rolling_avg = {}
 
-        for stat in self.stats_columns:
+        for stat in self._stats_columns:
             rolling_avg[f'Team_{stat}_avg'] = team_games[stat].tail(window).mean()
 
         return rolling_avg
@@ -192,11 +226,25 @@ class Model(ABC):
             winning.
 
         Raises:
-            RuntimeError: If model has not been trained.
             TypeError: If team1 or team2 or venue are not strings.
             ValueError: If team1 or team2 are not recognized, or venue is not one of 'H', 'N', 'A'.
         """
-        pass
+
+    @staticmethod
+    def _sigmoid(z) -> float:
+        return 1/(1 + np.exp(-z))
+
+    @staticmethod
+    def _sigmoid_deriv(z) -> float:
+        s = sigmoid(z)
+        return s * (1 - s)
+
+    # binary cross entropy gradient with l2 regularizer
+    @staticmethod
+    def _bce_grad(y, yhats, phi, w, lambda_=0.001):
+        mean = np.mean((yhats - y) * phi, axis=0).T
+        mean = np.reshape(mean, (-1,1))
+        return mean + lambda_ * 2 * w # add ridge regularizer
 
 class LogisticRegression(Model):
     """
@@ -225,51 +273,156 @@ class LogisticRegression(Model):
         super().__init__(year)
         self.__w = None
 
-    def train(self) -> None:
+    def train(self, epochs) -> None:
         if self.__w is not None:
             raise RuntimeError("Model has already been trained!")
         print("Training model, this may take a while...")
         n, d = self._alphas.shape
         phi = np.hstack((self._alphas, np.ones((n, 1))))
 
-        w = np.zeros((d + 1, 1))
-
-        # binary cross entropy gradient with l2 regularizer
-        def dl_l2(w, lambda_=0.001):
-            sum = 0
-            for i in range(n):
-                phi_lower = np.reshape(phi[i], (d + 1,1))
-                y_i = self._y[i]
-                sum += (self.__sigmoid(phi_lower, w) - y_i) * phi_lower
-            return (1/n) * sum + lambda_ * 2 * w # add ridge regularizer
+        self.__w = np.zeros((d + 1, 1))
 
         step = 0.001
-        iterations = 10000
 
-        for iteration in range(iterations):
-            u = dl_l2(w)
-            w = w - step * u
+        for epoch in range(epochs):
+            yhats, phi = self.forward(self._alphas)
+            #print('yh',yhats.shape)
+            u = self._bce_grad(self._y, yhats, phi, self.__w)
+            self.__w = self.__w - step * u
 
-        self.__w = w
         print("Model trained!")
 
-    @staticmethod
-    def __sigmoid(phi_lower: np.ndarray, w: np.ndarray) -> float:
-        """
-        Computes the sigmoid activation function, which maps input values to the range (0, 1), representing their probability of success.
+    def forward(self, alphas):
+        phi = np.hstack((alphas, np.ones((alphas.shape[0],1))))
+        q1 = self._sigmoid(phi.dot(self.__w))
+        return q1, phi
 
-        Params:
-            phi_lower (numpy array): input values to obtain probability
-            w (numpy array): weight vector applied to the input phi_lower to produce different probabilities.
+        # obtain rolling averages
+        team_rolling_avg = self._compute_rolling_average(team1)
+        opp_rolling_avg = self._compute_rolling_average(team2)
+        # obtain x vector
+        x = [self._ven_map[venue]]
+        for stat in self._stats_columns:
+            x.append(team_rolling_avg[f'Team_{stat}_avg'] - opp_rolling_avg[f'Team_{stat}_avg'])
+        x = np.array(x)
+        x = np.reshape(x,(-1,1))
+        # project x onto vhat
+        alpha = np.real(x.T.dot(self._vhat))
+        # probability of winning and losing
+        q1, _ = self.forward(alpha)
+        q0 = 1 - q1
+        return np.array([q0, q1])
 
-        Returns:
-            float: The probability result of the sigmoid activation function, between 0 and 1.
-        """
-        return 1/(1 + np.exp((-phi_lower.T.dot(w)).item()))
+    def accuracy(self, year):
+        other_df, other_X, other_y = self._get_data(year)
+        other_alphas = self._project(other_X)
 
-    def predict(self, team1: str, team2: str, venue: str) -> np.ndarray:
-        if self.__w is None:
-            raise RuntimeError("Model has not been trained!")
+        correct = 0
+        for i, alpha in enumerate(other_alphas):
+            alpha = np.reshape(alpha, (1, 1))
+            yhat, _ = self.forward(alpha)
+            yhat_round = 1 if yhat > 0.5 else 0
+            if yhat_round == other_y[i]:
+                correct += 1
+
+        return correct / other_alphas.shape[0]
+
+class MLP(Model):
+    # MLP with one hidden layer. made with numpy exclusively.
+
+    # allow for variable num hidden layers
+    def __init__(self, year: int, n_hidden = 1, width_hidden=8, lr=0.00001):
+        super().__init__(year)
+
+        # input layer
+        self.W = [np.random.randn(self._alphas.shape[1], width_hidden) * 0.01]
+        self.b = [np.zeros((1,width_hidden))]
+        # hidden layer(s)
+        for i in range(n_hidden):
+            self.W.append(np.random.randn(width_hidden, width_hidden) * 0.01)
+            self.b.append(np.zeros((1,width_hidden)))
+
+        # output layer
+        self.W.append(np.random.randn(width_hidden, 1) * 0.01)
+        self.b.append(np.zeros((1,1)))
+        self.lr = lr
+
+    def __bce_grad_simplified(self, y, yhats):
+        return (yhats - y) / (np.maximum((yhats * (1 - yhats)),1e-8))
+
+    def __bce(self, y, yhats):
+        return -np.mean(y * np.log(yhats + 1e-8) + (1 - y) * np.log(1 - yhats + 1e-8))
+
+    def train(self, epochs=10000) -> None:
+        for epoch in range(epochs):
+            yhats= self.forward(self._alphas)
+            self.backward(self._y, yhats)
+            print(self.__bce(self._y, yhats))
+
+        print("Model trained!")
+
+    def __relu(self, x):
+        return np.maximum(0,x)
+
+    def __relu_deriv(self, x):
+        return np.where(x > 0, 1, 0)
+
+    def forward(self, alpha: np.ndarray):
+        # iteratively activate each layer
+        self.activations = [alpha] # need input layer to start from
+        self.zs = []
+        # for the hidden layers
+        for i in range(len(self.W) - 1):
+            # dot previous activation with current W and add bias
+            z = np.dot(self.activations[-1], self.W[i]) + self.b[i]
+            # add aggregates to zs (to be used for backprop)
+            self.zs.append(z)
+            activation = self.__relu(z)
+            self.activations.append(activation)
+
+        # output layer only (uses sigmoid)
+        z = np.dot(self.activations[-1], self.W[-1]) + self.b[-1]
+        self.zs.append(z)
+        yhat = self._sigmoid(z)
+        self.activations.append(yhat)
+
+        return yhat
+
+    def backward(self, y, yhats):
+        W_grads = [None] * len(self.W)
+        b_grads = [None] * len(self.b)
+
+        # get it started with the very last connection, output
+        out_err = self.__bce_grad_simplified(y, yhats)
+        delta = out_err * self._sigmoid_deriv(self.zs[-1])
+
+        # go backward iteratively to backprop properly
+        for i in reversed(range(len(self.W))):
+            W_grads[i] = np.dot(self.activations[i].T, delta)
+            b_grads[i] = np.sum(delta, axis=0, keepdims=True)
+
+            # if not at the end, calculate next gradient
+            if i > 0:
+                delta = np.dot(delta, self.W[i].T) * self.__relu_deriv(self.zs[i-1])
+
+        # finally update all weights
+        for i in range(len(self.W)):
+            self.W[i] -= self.lr * W_grads[i]
+            self.b[i] -= self.lr * b_grads[i]
+
+    def accuracy(self, year):
+        other_df, other_X, other_y = self._get_data(year)
+        other_alphas = self._project(other_X)
+
+        correct = 0
+        for i, alpha in enumerate(other_alphas):
+            yhat = 1 if self.forward(alpha.reshape(1, -1)) > 0.5 else 0
+            if yhat == other_y[i]:
+                correct += 1
+
+        return correct / other_alphas.shape[0]
+
+    def predict(self, team1: str, team2: str, venue: str):
         if venue not in self._ven_map.keys():
             raise ValueError("venue must be one of the following strings: 'H', 'N', and 'A'.")
 
@@ -278,14 +431,13 @@ class LogisticRegression(Model):
         opp_rolling_avg = self._compute_rolling_average(team2)
         # obtain x vector
         x = [self._ven_map[venue]]
-        for stat in self.stats_columns:
+        for stat in self._stats_columns:
             x.append(team_rolling_avg[f'Team_{stat}_avg'] - opp_rolling_avg[f'Team_{stat}_avg'])
         x = np.array(x)
         x = np.reshape(x,(-1,1))
         # project x onto vhat
-        alpha = np.real(x.T.dot(self.vhat))
+        alpha = np.real(x.T.dot(self._vhat))
         # probability of winning and losing
-        phi_lower = np.vstack((alpha, np.ones((1,1))))
-        q1 = self.__sigmoid(phi_lower, self.__w)
+        q1 = self.forward(alpha)
         q0 = 1 - q1
         return np.array([q0, q1])
