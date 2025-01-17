@@ -17,12 +17,13 @@ This module defines the fundamental classes and structure for representing a Mar
 ### 2. `madness.py`
 This script initializes the tournament setup, models the games, and calculates expected values for various scenarios:
 - **Team Initialization**: Sets up teams for each region (South, West, Midwest, East) based on ESPN seeding predictions.
-- **Game Simulation**: Uses logistic regression predictions to simulate game outcomes.
+- **Game Simulation**: Uses either MLP or logistic regression predictions to simulate game outcomes.
 - **Bracket Progression**: Progresses through rounds until the championship, calculating expected values at each stage.
 
 ### 3. `model.py`
 This module defines machine learning models to predict game outcomes based on historical data:
-- **Logistic Regression Model**: A binary classifier with L2 regularization to predict the probability of one team defeating another.
+- **MLP Model**: A multilayer perceptron with variable width and depth to predict the probability of one team defeating another.
+- **Logistic Regression Model**: A binary classifier with L2 regularization to also predict probabilities.
 - **Feature Engineering**: Computes rolling averages and differentials for team stats to enhance predictive accuracy.
 - **Data Pipeline**: Loads and preprocesses data from Barttorvik.com, including adjustments for venue and statistical comparisons.
 
@@ -56,12 +57,11 @@ pip install numpy pandas
    The script outputs the expected values for each matchup, helping identify the most probable and profitable brackets.
 
 ## Features
-- **Probabilistic Modeling**: Uses logistic regression to compute game outcome probabilities.
+- **Probabilistic Modeling**: Uses MLP or logistic regression to compute game outcome probabilities.
 - **Dynamic Bracket Simulation**: Progresses through the tournament based on model predictions.
 - **Rolling Statistics**: Incorporates advanced stats like adjusted offensive and defensive efficiencies for better accuracy.
 
 ## Future Enhancements
-- Add more model types (e.g., SVM, Neural Networks) to compare predictive accuracy.
 - Include features like player-level statistics or injury data.
 - Optimize for different office pool scoring systems.
 
