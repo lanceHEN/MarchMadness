@@ -297,6 +297,14 @@ class MLP(Model):
         print("Model trained!")
 
     @staticmethod
+    def __layer_norm(x):
+        epsilon = 1e-8
+        xmean = np.mean(x, axis=1, keepdims=True)
+        xvar = np.var(x, axis=1, keepdims=True)
+        xhat = (x - xmean) / np.sqrt(xvar + epsilon)
+        return xhat
+
+    @staticmethod
     def __relu(x):
         return np.maximum(0,x)
 
@@ -314,6 +322,7 @@ class MLP(Model):
             z = np.dot(self.activations[-1], self.W[i]) + self.b[i]
             # add aggregates to zs (to be used for backprop)
             self.zs.append(z)
+            z = self.__layer_norm(z)
             activation = self.__relu(z)
             self.activations.append(activation)
 
@@ -333,19 +342,39 @@ class MLP(Model):
         out_err = self.__bce_grad_simplified(y, yhats)
         delta = out_err * self._sigmoid_deriv(self.zs[-1])
 
+        # compute grads for the output layer
+        W_grads[-1] = np.dot(self.activations[-2].T, delta)
+        b_grads[-1] = np.sum(delta, axis=0, keepdims=True)
+
         # go backward iteratively to backprop properly
-        for i in reversed(range(len(self.W))):
+        for i in reversed(range(len(self.W) - 1)):
+            delta = np.dot(delta, self.W[i+1].T) * self.__relu_deriv(self.zs[i-1]) # backprop through relu
             W_grads[i] = np.dot(self.activations[i].T, delta)
             b_grads[i] = np.sum(delta, axis=0, keepdims=True)
 
-            # if not at the end, calculate next gradient
-            if i > 0:
-                delta = np.dot(delta, self.W[i].T) * self.__relu_deriv(self.zs[i-1])
+            delta = self.__layer_norm_backward(delta, self.zs[i-1]) # backprop through layer norm
 
         # finally update all weights
         for i in range(len(self.W)):
             self.W[i] -= self._lr * W_grads[i]
             self.b[i] -= self._lr * b_grads[i]
+
+    def __layer_norm_backward(self, grad_output, z):
+        epsilon = 1e-8
+        n, features = z.shape
+
+        # Forward pass components
+        mean = np.mean(z, axis=1, keepdims=True)
+        var = np.var(z, axis=1, keepdims=True)
+        std = np.sqrt(var + epsilon)
+        z_norm = (z - mean) / std
+
+        # backprop
+        grad_z_norm = grad_output / std  # Gradient w.r.t. normalized z
+        grad_variance = np.sum(grad_output * (z - mean) * (-0.5) * (std**-3), axis=1, keepdims=True)
+        grad_mean = np.sum(grad_output * (-1 / std), axis=1, keepdims=True) + grad_variance * np.mean(-2 * (z - mean), axis=1, keepdims=True)
+
+        return grad_z_norm + (grad_variance * 2 * (z - mean) / features) + (grad_mean / features)
 
     def accuracy(self, year):
         other_df, other_X, other_y = get_data(year)

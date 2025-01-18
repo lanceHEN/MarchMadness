@@ -110,8 +110,8 @@ east181 = Team("Kentucky", 2)
 east182 = Team("High Point", 15)
 
 # init model and train
-model = MLP(2024, n_hidden=2, lr=0.00001, width_hidden=32)
-model.train(epochs=30000)
+model = MLP(2025, n_hidden=2, lr=0.0001, width_hidden=16)
+model.train(epochs=3000)
 print("Accuracy for 2024 season:",model.accuracy(year=2024))
 
 # init games

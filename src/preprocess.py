@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+from sklearn import preprocessing
 
 res_map = {'W':1, 'L':0} #map categorical to numeric
 ven_map = {'H':1, 'N':0, 'A':-1}
@@ -60,6 +61,7 @@ def get_data(year):
     features = ['Venue', 'AdjO_diff', 'AdjD_diff', 'OffEfg%_diff', 'OffTo%_diff', 'OffReb%_diff', 'OffFTR_diff',
                 'DefEfg%_diff', 'DefTo%_diff', 'DefReb%_diff', 'DefFTR_diff']
     X = df[features].to_numpy()
+    X = preprocessing.scale(X)
     y = df['Win'].to_numpy()
     y = np.reshape(y,(-1,1))
 
