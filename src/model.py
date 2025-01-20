@@ -319,12 +319,13 @@ class MLP(Model):
         # for the hidden layers
         for i in range(len(self.W) - 1):
             # dot previous activation with current W and add bias
+            # z = aw + b
             z = np.dot(self.activations[-1], self.W[i]) + self.b[i]
             # add aggregates to zs (to be used for backprop)
             self.zs.append(z)
             z = self.__layer_norm(z)
-            activation = self.__relu(z)
-            self.activations.append(activation)
+            a = self.__relu(z)
+            self.activations.append(a)
 
         # output layer only (uses sigmoid)
         z = np.dot(self.activations[-1], self.W[-1]) + self.b[-1]
@@ -339,19 +340,26 @@ class MLP(Model):
         b_grads = [None] * len(self.b)
 
         # get it started with the very last connection, output
-        out_err = self.__bce_grad_simplified(y, yhats)
-        delta = out_err * self._sigmoid_deriv(self.zs[-1])
+        # dL/df * df/dz(L) = dL/dz(L)
+        out_err = self.__bce_grad_simplified(y, yhats) # dL/df
+        delta = out_err * self._sigmoid_deriv(self.zs[-1]) #df/dz(L)
 
         # compute grads for the output layer
+        # dL/dW(L) = delta(L)*a(L-1) # error out * error in
         W_grads[-1] = np.dot(self.activations[-2].T, delta)
+        # dL/db(L) = delta(L) nice and easy!
         b_grads[-1] = np.sum(delta, axis=0, keepdims=True)
 
         # go backward iteratively to backprop properly
         for i in reversed(range(len(self.W) - 1)):
+            # delta = (w(l+1)^T*delta(l+1)) * df/dz
             delta = np.dot(delta, self.W[i+1].T) * self.__relu_deriv(self.zs[i-1]) # backprop through relu
+            # dL/dw(l) = a(l-1) * delta(l)
             W_grads[i] = np.dot(self.activations[i].T, delta)
+            # dL/db(1) = delta(l)
             b_grads[i] = np.sum(delta, axis=0, keepdims=True)
 
+            # layer norm grad
             delta = self.__layer_norm_backward(delta, self.zs[i-1]) # backprop through layer norm
 
         # finally update all weights
