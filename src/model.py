@@ -265,20 +265,21 @@ class MLP(Model):
     # MLP with one hidden layer. made with numpy exclusively.
 
     # allow for variable num hidden layers
-    def __init__(self, year: int, n_hidden = 1, width_hidden=8, lr=0.00001):
+    def __init__(self, year: int, n_hidden = 1, width_hidden=8, lr=0.00001, dropout=0.1):
         super().__init__(year, lr)
 
         # input layer
-        self.W = [np.random.randn(self._alphas.shape[1], width_hidden) * 0.01]
+        self.W = [np.random.normal(0, 1/(self._alphas.shape[1])**2, (self._alphas.shape[1], width_hidden))]
         self.b = [np.zeros((1,width_hidden))]
+        self.dropout = dropout
         # hidden layer(s)
         for i in range(n_hidden):
-            self.W.append(np.random.randn(width_hidden, width_hidden) * 0.01)
-            self.b.append(np.zeros((1,width_hidden)))
+            self.W.append(np.random.normal(0, 1/(n_hidden)**2, (width_hidden, width_hidden)))
+            self.b.append(np.ones((1,width_hidden)))
 
         # output layer
-        self.W.append(np.random.randn(width_hidden, 1) * 0.01)
-        self.b.append(np.zeros((1,1)))
+        self.W.append(np.random.normal(0, 1/(n_hidden)**2, (width_hidden, 1)))
+        self.b.append(np.ones((1,1)))
 
     @staticmethod
     def __bce_grad_simplified(y, yhats):
@@ -288,10 +289,10 @@ class MLP(Model):
     def __bce(y, yhats):
         return -np.mean(y * np.log(yhats + 1e-8) + (1 - y) * np.log(1 - yhats + 1e-8))
 
-    def train(self, epochs=10000) -> None:
+    def train(self, epochs=10000, lambda_=1) -> None:
         for epoch in range(epochs):
             yhats= self.forward(self._alphas)
-            self.backward(self._y, yhats)
+            self.backward(self._y, yhats, lambda_)
             print(self.__bce(self._y, yhats))
 
         print("Model trained!")
@@ -312,7 +313,7 @@ class MLP(Model):
     def __relu_deriv(x):
         return np.where(x > 0, 1, 0)
 
-    def forward(self, alpha: np.ndarray):
+    def forward(self, alpha: np.ndarray, train=True):
         # iteratively activate each layer
         self.activations = [alpha] # need input layer to start from
         self.zs = []
@@ -325,17 +326,25 @@ class MLP(Model):
             self.zs.append(z)
             z = self.__layer_norm(z)
             a = self.__relu(z)
+            # using dropout technique discussed in AlexNet paper!
+            if train:
+                # because a contains activations for all neurons, we have to be careful about not setting everything to 0
+                drop_mask = np.random.rand(a.shape[0], a.shape[1]) > self.dropout
+                a *= drop_mask
+            else:
+                a /= (1 - self.dropout) # scale during eval to maintain correct expected val
             self.activations.append(a)
 
         # output layer only (uses sigmoid)
         z = np.dot(self.activations[-1], self.W[-1]) + self.b[-1]
         self.zs.append(z)
         yhat = self._sigmoid(z)
+
         self.activations.append(yhat)
 
         return yhat
 
-    def backward(self, y, yhats):
+    def backward(self, y, yhats, lambda_=1):
         W_grads = [None] * len(self.W)
         b_grads = [None] * len(self.b)
 
@@ -355,7 +364,7 @@ class MLP(Model):
             # delta = (w(l+1)^T*delta(l+1)) * df/dz
             delta = np.dot(delta, self.W[i+1].T) * self.__relu_deriv(self.zs[i-1]) # backprop through relu
             # dL/dw(l) = a(l-1) * delta(l)
-            W_grads[i] = np.dot(self.activations[i].T, delta)
+            W_grads[i] = np.dot(self.activations[i].T, delta) + lambda_ * 2 * self.W[i] # L2 norm to reduce overfitting
             # dL/db(1) = delta(l)
             b_grads[i] = np.sum(delta, axis=0, keepdims=True)
 
@@ -390,7 +399,7 @@ class MLP(Model):
 
         correct = 0
         for i, alpha in enumerate(other_alphas):
-            yhat = 1 if self.forward(alpha.reshape(1, -1)) > 0.5 else 0
+            yhat = 1 if self.forward(alpha.reshape(1, -1), train=False) > 0.5 else 0
             if yhat == other_y[i]:
                 correct += 1
 
