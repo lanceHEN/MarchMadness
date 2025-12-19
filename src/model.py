@@ -1,10 +1,6 @@
 from abc import ABC, abstractmethod
 import numpy as np
-import pandas as pd
-from keras.src.backend.jax.nn import sigmoid
-from sklearn.metrics import accuracy_score
-from sklearn.model_selection import train_test_split
-from src.preprocess import get_data, ven_map, res_map, stats_columns
+from preprocess import get_data, ven_map, stats_columns
 
 """
 The model module contains classes useful for predicting the likelihood of one college basketball team beating another
@@ -41,7 +37,7 @@ class Model(ABC):
     Importantly, the model is not trained on construction. Rather, it must have its train method called.
     """
 
-    def __init__(self, year: int, lr: float):
+    def __init__(self, year: int, lr: float, projected_dim: int=2):
         """
         Constructs a model using barttorvik.com data for the given year.
 
@@ -50,18 +46,19 @@ class Model(ABC):
             lr (float): Learning rate.
 
         Raises:
-            ValueError: If year is not a positive integer between 2008 and the current year, inclusive.
+            ValueError: If year is not a positive integer between 2008 and the current year, inclusive,
+                or if projected_dim < 1.
         """
         self._df, self._X, self._y = get_data(year)
-        self._vhat = self._get_vhat(self._X, self._y)
+        self._vhats = self._get_vhats(self._X, self._y, projected_dim)
         self._alphas = self._project(self._X)
         self._w = None
         self._lr = lr
 
-    def _get_vhat(self, X, y):
-        # perform LDA, projecting onto 1 dimension
-        X1 = X[y.flatten()==1]
-        X0 = X[y.flatten()==0]
+    def _get_vhats(self, X, y, projected_dim):
+        # perform LDA, projecting onto 2 dimensions
+        X1 = X[y.flatten()==1] # wins
+        X0 = X[y.flatten()==0] # losses
         u = np.reshape(np.mean(X0, axis=0) - np.mean(X1, axis=0), (X.shape[1],1))
         S1 = u.dot(u.T)
         C0 = np.eye(X0.shape[0]) - 1/X0.shape[0] * np.ones((X0.shape[0],X0.shape[0]))
@@ -69,13 +66,15 @@ class Model(ABC):
         S2 = X0.T.dot(C0.dot(X0)) + X1.T.dot(C1.dot(X1))
         Q = np.linalg.inv(S2).dot(S1)
         #print(np.linalg.eig(Q))
-        most_important_idx = np.argmax(np.linalg.eig(Q)[0])
-        vhat = np.reshape(np.linalg.eig(Q)[1][:,most_important_idx],(-1,1))
-        return vhat
+        most_important_indices = np.argpartition(np.linalg.eig(Q)[0], -projected_dim)[-projected_dim:]
+        vhats = np.linalg.eig(Q)[1][:,most_important_indices] # d, projected_dim
+        return vhats
 
     def _project(self, X):
-        #project data
-        alphas = X.dot(self._vhat)
+        #print(X.shape)
+        #print(self._vhats)
+        #note X is expected to have each sample as a row
+        alphas = X.dot(self._vhats) # n, projected_dim
         alphas = np.real(alphas)
         return alphas
 
@@ -84,12 +83,23 @@ class Model(ABC):
         """
         EFFECT: Trains this model with the data given to it on construction.
 
-        Parameters:
+        Args:
             epochs (int): Number of iterations to train for
 
         Raises:
             RuntimeError: If this model has already been trained.
         """
+        pass
+    
+    @abstractmethod
+    def _forward(self, phi: np.ndarray) -> np.ndarray:
+        """Given phi (data plus bias column) of shape (n, d+1), produces win probabilities.
+        
+        Args:
+            phi (np.ndarray): Data plus bias column.
+            
+        Returns:
+            np.ndarray: Win probabilities for each sample."""
         pass
 
     @abstractmethod
@@ -174,9 +184,10 @@ class Model(ABC):
         x = np.array(x)
         x = np.reshape(x,(-1,1))
         # project x onto vhat
-        alpha = np.real(x.T.dot(self._vhat))
+        alphas = self._project(x.T) # 1, projected_dim
         # probability of winning and losing
-        q1 = self.forward(alpha)
+        phi = np.hstack((alphas, np.ones((alphas.shape[0],1))))
+        q1 = self._forward(phi)
         q0 = 1 - q1
         return np.array([q0, q1])
 
@@ -186,7 +197,7 @@ class Model(ABC):
 
     @staticmethod
     def _sigmoid_deriv(z) -> float:
-        s = sigmoid(z)
+        s = Model._sigmoid(z)
         return s * (1 - s)
 
 
@@ -227,27 +238,27 @@ class LogisticRegression(Model):
 
         self.__w = np.zeros((d + 1, 1))
 
-        for epoch in range(epochs):
-            yhats, phi = self.forward(self._alphas)
+        for _ in range(epochs):
+            yhats = self._forward(phi)
             #print('yh',yhats.shape)
             u = self.__bce_grad(self._y, yhats, phi, self.__w)
             self.__w = self.__w - self._lr * u
 
         print("Model trained!")
 
-    def forward(self, alphas):
-        phi = np.hstack((alphas, np.ones((alphas.shape[0],1))))
+    def _forward(self, phi):
         q1 = self._sigmoid(phi.dot(self.__w))
-        return q1, phi
+        return q1
 
     def accuracy(self, year):
         other_df, other_X, other_y = get_data(year)
         other_alphas = self._project(other_X)
 
         correct = 0
-        for i, alpha in enumerate(other_alphas):
-            alpha = np.reshape(alpha, (1, 1))
-            yhat, _ = self.forward(alpha)
+        for i, alphas in enumerate(other_alphas):
+            alphas = np.reshape(alphas, (1, alphas.shape[0]))
+            phi = np.hstack((alphas, np.ones((1, 1))))
+            yhat = self._forward(phi)
             yhat_round = 1 if yhat > 0.5 else 0
             if yhat_round == other_y[i]:
                 correct += 1
@@ -290,8 +301,9 @@ class MLP(Model):
         return -np.mean(y * np.log(yhats + 1e-8) + (1 - y) * np.log(1 - yhats + 1e-8))
 
     def train(self, epochs=10000, lambda_=1) -> None:
-        for epoch in range(epochs):
-            yhats= self.forward(self._alphas)
+        phi = np.hstack((self._alphas, np.ones((n, 1))))
+        for _ in range(epochs):
+            yhats= self._forward(phi)
             self.backward(self._y, yhats, lambda_)
             print(self.__bce(self._y, yhats))
 
@@ -313,9 +325,9 @@ class MLP(Model):
     def __relu_deriv(x):
         return np.where(x > 0, 1, 0)
 
-    def forward(self, alpha: np.ndarray, train=True):
+    def _forward(self, phi: np.ndarray, train=True):
         # iteratively activate each layer
-        self.activations = [alpha] # need input layer to start from
+        self.activations = [phi] # need input layer to start from
         self.zs = []
         # for the hidden layers
         for i in range(len(self.W) - 1):
@@ -398,8 +410,9 @@ class MLP(Model):
         other_alphas = self._project(other_X)
 
         correct = 0
-        for i, alpha in enumerate(other_alphas):
-            yhat = 1 if self.forward(alpha.reshape(1, -1), train=False) > 0.5 else 0
+        for i, alphas in enumerate(other_alphas):
+            phi = phi = np.hstack((alphas, np.ones((n, 1))))
+            yhat = 1 if self._forward(phi, train=False) > 0.5 else 0
             if yhat == other_y[i]:
                 correct += 1
 
