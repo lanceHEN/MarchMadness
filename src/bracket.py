@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
-from src.model import Model
+from model import Model
+from typing import Set
 
 """
 The bracket module contains classes that make up a tree-like bracket of the March Madness tournament.
@@ -200,7 +201,7 @@ class Game(ABC):
 
         probs_map = self.get_probs()
         for team in probs_map:
-            probs_map[team] = probs_map[team] * team.get_seed * 2**(self._round - 1) + self._parent.get_expected_values()[team]
+            probs_map[team] = probs_map[team] * team.get_seed * 2**(self._round - 1)# + self._parent.get_expected_values()[team]
 
         probs_map = self._sort_dict(probs_map)
         self._cached_expected_vals = probs_map
@@ -217,7 +218,7 @@ class Game(ABC):
             raise RuntimeError("Parent is not defined")
 
     @abstractmethod
-    def get_games(self) -> dict[int, list['Game']]:
+    def get_games(self) -> Set['Game']:
         """
         Produces a dict from round to its corresponding Games, for each Game contained in this Game object
          (including itself).
@@ -312,8 +313,8 @@ class BaseGame(Game):
         self._cached_probs = self._sort_dict({self.__team1: team_1_prediction, self.__team2: team_2_prediction})
         return self._cached_probs
 
-    def get_games(self) -> dict[int, Game]:
-        return {self._round: [self]}
+    def get_games(self) -> Set[Game]:
+        return {self}
 
     def get_teams(self) -> list[Team]:
         return [self.__team1, self.__team2]
@@ -382,13 +383,10 @@ class UpperGame(Game):
         self._cached_probs = probs_map
         return probs_map
 
-    def get_games(self) -> dict[int, Game]:
-        games = self.__game1.get_games()
+    def get_games(self) -> Set[Game]:
+        games1 = self.__game1.get_games()
         games2 = self.__game2.get_games()
-        for round in games.keys():
-            games[round] += games2[round]
-        games[self._round] = [self]
-        return games
+        return games1 | games2 | {self}
 
     def get_teams(self) -> list[Team]:
         return self.__game1.get_teams() + self.__game2.get_teams()
@@ -437,7 +435,7 @@ class Sentinel(Game):
         return values_dict
 
     # produces all games in this Sentinel, not including this Sentinel.
-    def get_games(self) -> dict[int, Game]:
+    def get_games(self) -> Set[Game]:
         return self.__game.get_games()
 
     # produces all teams in this Sentinel.
