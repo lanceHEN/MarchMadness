@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from model import Model
-from typing import Set
+from typing import Set, List, Dict, Tuple
 
 """
 The bracket module contains classes that make up a tree-like bracket of the March Madness tournament.
@@ -25,9 +25,6 @@ basegame_1 = BaseGame(model, auburn, lamar)
 basegame_2 = BaseGame(model, unc, wisconsin)
 
 championship = UpperGame(model, 2, basegame_1, basegame_2)
-
-# add sentinel
-sentinel = Sentinel(championship)
 
 # get probabilities for winning championship
 probs = championship.get_probabilities()
@@ -116,17 +113,19 @@ class Game(ABC):
     A canonical game may either contain two teams (hence representing a "base game") or two
     more Games (hence representing an "upper game" in the later rounds of the tournament). Games can be interpreted
     as nodes of a binary tree, whose root is the championship, and whose leaves are the "base games". All canonical
-    games have a Model object to determine win probabilities, and a round they are in. Importantly, all canonical games
-    must also have a parent, including the championship. Having a parent for the championship is accomplished by
-    instantiating a Sentinel whose only child is the championship node.
+    games have a Model object to determine win probabilities, and a round they are in.
 
     Attributes:
         _model: A Model object responsible for calculating win probabilities for the game.
         _round: An integer representing the round of the game.
-        _parent: A Game object that is the parent of this Game object.
+        _teams: Set of all teams within the game.
         _cached_probs: A dict object that is the output of self.get_probs(), useful for preventing duplicate computations.
-        _cached_expected_vals: A dict object that is the output of self.get_expected_vals(), useful for preventing
-        duplicate computations.
+            Note because of the tree structure, each game should only have get_probs called once in the recursive tree, so
+            the caching is less for expediting the initial call and more for convenience in case it happens to be called again
+            (e.g. in get_expected_values).
+        _cached_optimal_total_evs: A dict that is the cached output of get_opt_total_evs(), useful for preventing duplicate
+            computations. Similar to _cached_probs, get_opt_total_evs() is only called once for each node in the recursive tree
+            so this is more for saving time in case it happens to be called again.
     """
 
     def __init__(self, model: Model, round: int):
@@ -144,100 +143,86 @@ class Game(ABC):
             raise ValueError('round must be a positive integer')
         self._model = model
         self._round = round
-        self._parent = None
+        self._initialize_teams()
         self._cached_probs = None
-        self._cached_expected_vals = None
-
-    def _add_parent(self, parent: 'Game') -> None:
-        """
-        Adds the given Game object as the parent to this Game object.
-
-        Args:
-            parent (Game): The requested parent of this Game object.
-
-        Raises:
-            RuntimeError: If this Game object already has a parent.
-            TypeError: If parent is a BaseGame object.
-        """
-        if self._parent is not None:
-            raise RuntimeError('Game already has a parent')
-        if isinstance(parent, BaseGame):
-            raise TypeError('parent cannot be a BaseGame object')
-        self._parent = parent
+        self._cached_optimal_total_evs = None
 
     @abstractmethod
-    def get_probs(self) -> dict[Team, float]:
+    def get_probs(self) -> Dict[Team, float]:
         """
         Determines the probability of each possible team in this Game winning this game and any previous games, producing
         a dict from such teams to their probabilities.
+        
+        EFFECT: Caches result to self._cached_probs.
+        
+        Note because of the tree structure, each game should only have get_probs called once in the recursive tree, so
+        the caching is less for expediting the initial call and more for convenience in case it happens to be called again
+        (e.g. in get_expected_values).
 
         Returns:
-            dict: A dict from each possible team in this game to their probability of winning this game and all games in
+            Dict[Team, float]: A dict from each possible team in this game to their probability of winning this game and all games in
             earlier rounds.
-
-        Raises:
-            RuntimeError: If this Game object does not have a parent.
         """
         pass
 
-    def get_expected_values(self) -> dict[Team, float]:
+    def get_expected_values(self) -> Dict[Team, float]:
         """
-        Determines the expected points for each possible team in this Game and any later games in higher rounds, producing a dict
+        Determines the expected points for each possible team in this Game, producing a dict
         from teams to their expected points. Expected points for a team are calculated by multiplying the probability of
         winning the game by the number of points they would earn, where such points are determined by multiplying the seed
-        of the team by 2^round. To account for later expected winnings, expected points in later rounds are added to the
-        totals.
+        of the team by 2^(round-1) where round is 1 indexed.
 
         Returns:
-            dict: A dict from each possible team in this game to their expected points in this game's round and all later
-            rounds.
+            Dict[Team, float]: A dict from each possible team in this game to their expected points for this game.
 
-        Raises:
-            RuntimeError: If this Game object does not have a parent.
         """
-        self._check_has_parent()
-        if self._cached_expected_vals is not None:
-            return self._cached_expected_vals
+        evs_map = self.get_probs().copy()
+        for team in evs_map:
+            evs_map[team] = evs_map[team] * Game._get_value(team, self._round)
 
-        probs_map = self.get_probs()
-        for team in probs_map:
-            probs_map[team] = probs_map[team] * team.get_seed * 2**(self._round - 1)# + self._parent.get_expected_values()[team]
-
-        probs_map = self._sort_dict(probs_map)
-        self._cached_expected_vals = probs_map
-        return probs_map
-
-    def _check_has_parent(self) -> None:
-        """
-        Determines if this Game object does not have a parent, throwing a RuntimeError if so.
-
-        Raises:
-            RuntimeError: If this Game object does not have a parent.
-        """
-        if self._parent is None:
-            raise RuntimeError("Parent is not defined")
-
+        return evs_map
+    
     @abstractmethod
-    def get_games(self) -> Set['Game']:
+    def get_opt_total_evs(self) -> Dict[Team, Tuple[float, Team]]:
+        """
+        For each team in this game, finds the optimal total expected value for the bracket subtree
+        rooted at this game in the case that team wins this game (and therefore qualifies for it).
+        Also returns the losing team for reference (None if it's a base game).
+        
+        This is a dynamic programming approach to allow one to find a globally optimal valid
+        bracket that maximizes expected values. The bracket can be reconstructed by picking
+        the team with the highest total e.v. for the championship, and reconstructing the bracket
+        using get_opt_total_evs, called on that team and the losing team, in the child games.
+        
+        Returns:
+            Dict[Team, Tuple[float, Team]]: Mapping from each team to their optimal total expected
+                points, and the losing team in the optimal configuration.
+        """
+        pass
+        
+    @abstractmethod
+    def get_games(self) -> Dict[int, List['Game']]:
         """
         Produces a dict from round to its corresponding Games, for each Game contained in this Game object
          (including itself).
 
         Returns:
-            dict: a dict from round to its corresponding Games, for each Game contained in this Game object
+            Dict[int, List['Game']]: a dict from round to its corresponding Games, for each Game contained in this Game object
             (including itself).
         """
         pass
 
-    @abstractmethod
-    def get_teams(self) -> list[Team]:
+    @property
+    def get_teams(self) -> Set[Team]:
         """
-        Produces a list of all teams contained in this Game. The list is produced in order, with the leftmost team first
-        and the rightmost team last, where leftmost corresponds to the first team in the base game and rightmost corrsponds
-        to the second team in the base game.
-
-        Returns:
-            list: a list of all teams contained in this Game.
+        Produces a set of all teams contained in this Game.
+        """
+        return self._teams
+    
+    @abstractmethod
+    def _initialize_teams(self) -> None:
+        """
+        EFFECT: Initializes self._teams
         """
         pass
 
@@ -252,23 +237,9 @@ class Game(ABC):
         return self._round
 
     @staticmethod
-    def _sort_dict(dictionary: dict) -> dict:
-        """
-        Given a dict, produces a sorted version in ascending order.
-
-        Args:
-            dictionary (dict): A dict to sort.
-
-        Returns:
-            dict: A sorted version of dictionary in ascending order.
-
-        Raises:
-            TypeError: If dictionary is not a dict.
-        """
-        if not isinstance(dictionary, dict):
-            raise TypeError('dictionary is not a dict')
-        dict_sorted = {k: v for k, v in sorted(dictionary.items(), key=lambda item: item[1])}
-        return dict_sorted
+    def _get_value(team: Team, round: int):
+        """Produces the value for the team winning the given round, given by seed*2^(round-1)."""
+        return team.get_seed * 2**(round - 1)
 
 class BaseGame(Game):
     """
@@ -278,10 +249,14 @@ class BaseGame(Game):
     Attributes:
         _model: A Model object responsible for calculating win probabilities for the BaseGame.
         _round: An integer representing the round of the BaseGame.
-        _parent: A Game object that is the parent of this BaseGame object.
+        _teams: Set of all teams within the game.
         _cached_probs: A dict object that is the output of self.get_probs(), useful for preventing duplicate computations.
-        _cached_expected_vals: A dict object that is the output of self.get_expected_vals(), useful for preventing
-        duplicate computations.
+            Note because of the tree structure, each game should only have get_probs called once in the recursive tree, so
+            the caching is less for expediting the initial call and more for convenience in case it happens to be called again
+            (e.g. in get_expected_values).
+        _cached_optimal_total_evs: A dict that is the cached output of get_opt_total_evs(), useful for preventing duplicate
+            computations. Similar to _cached_probs, get_opt_total_evs() is only called once for each node in the recursive tree
+            so this is more for saving time in case it happens to be called again.
         __team1: The first team in this BaseGame.
         __team2: The second team in this BaseGame.
     """
@@ -299,25 +274,37 @@ class BaseGame(Game):
         Raises:
             ValueError if round <= 0
         """
-        super().__init__(model, round)
         self.__team1 = team1
         self.__team2 = team2
+        
+        # Have to call this AFTER team1 and team2 are initialized or else an error will raise when trying to initialize
+        # self._teams
+        super().__init__(model, round)
 
-    def get_probs(self) -> dict[Team, float]:
-        self._check_has_parent()
-        if self._cached_probs is not None:
-            return self._cached_probs
-
-        team_1_prediction = self._model.predict(self.__team1.get_name, self.__team2.get_name, 'N')[1]
-        team_2_prediction = 1 - team_1_prediction
-        self._cached_probs = self._sort_dict({self.__team1: team_1_prediction, self.__team2: team_2_prediction})
+    def get_probs(self) -> Dict[Team, float]:
+        if self._cached_probs is None:
+            team_1_prediction = self._model.predict(self.__team1.get_name, self.__team2.get_name, 'N')[1]
+            team_2_prediction = 1 - team_1_prediction
+            self._cached_probs = {self.__team1: team_1_prediction, self.__team2: team_2_prediction}
+            
         return self._cached_probs
+    
+    def get_opt_total_evs(self) -> Dict[Team, Tuple[float, Team]]:
+        if self._cached_optimal_total_evs is None:
+            probs_map = self.get_probs()
+            opt_ev_map = {}
+            for team in probs_map:
+                opt_ev_map[team] = (self._get_value(team, self._round) * probs_map[team], None)
+                
+            self._cached_optimal_total_evs = opt_ev_map
+        
+        return self._cached_optimal_total_evs
+    
+    def _initialize_teams(self) -> None:
+        self._teams = {self.__team1, self.__team2}
 
-    def get_games(self) -> Set[Game]:
-        return {self}
-
-    def get_teams(self) -> list[Team]:
-        return [self.__team1, self.__team2]
+    def get_games(self) -> Dict[int, List[Game]]:
+        return {self._round: [self]}
 
 class UpperGame(Game):
     """
@@ -328,10 +315,14 @@ class UpperGame(Game):
     Attributes:
         _model: A Model object responsible for calculating win probabilities for the UpperGame.
         _round: An integer representing the round of the UpperGame.
-        _parent: A Game object that is the parent of this UpperGame object.
+        __teams: Set of all teams within the game.
         _cached_probs: A dict object that is the output of self.get_probs(), useful for preventing duplicate computations.
-        _cached_expected_vals: A dict object that is the output of self.get_expected_vals(), useful for preventing
-        duplicate computations.
+            Note because of the tree structure, each game should only have get_probs called once in the recursive tree, so
+            the caching is less for expediting the initial call and more for convenience in case it happens to be called again
+            (e.g. in get_expected_values).
+        _cached_optimal_total_evs: A dict that is the cached output of get_opt_total_evs(), useful for preventing duplicate
+            computations. Similar to _cached_probs, get_opt_total_evs() is only called once for each node in the recursive tree
+            so this is more for saving time in case it happens to be called again.
         __game1: The first game in this UpperGame.
         __game2: The second game in this UpperGame.
     """
@@ -348,96 +339,85 @@ class UpperGame(Game):
         Raises:
         RuntimeError: If round <= 0
         """
-        super().__init__(model, round)
         self.__game1 = game1
         self.__game2 = game2
-        self.__game1._add_parent(self)
-        self.__game2._add_parent(self)
+        
+        # Have to call this AFTER game1 and game2 are initialized or else an error will raise when trying to initialize
+        # self._teams
+        super().__init__(model, round)
 
-    def get_probs(self) -> dict[Team, float]:
-        self._check_has_parent()
-        if self._cached_probs is not None:
-            return self._cached_probs
-
-        probs_map = dict.fromkeys(self.get_teams())
-        game_1_probs = self.__game1.get_probs()
-        game_2_probs = self.__game2.get_probs()
-        # iterate over game 1
-        for team in self.__game1.get_teams():
-            sum = 0
-            for opp in self.__game2.get_teams():
-                sum += (game_1_probs[team]
+    def get_probs(self) -> Dict[Team, float]:
+        if self._cached_probs is None:
+            probs_map = dict.fromkeys(self.get_teams)
+            game_1_probs = self.__game1.get_probs()
+            game_2_probs = self.__game2.get_probs()
+            # iterate over game 1
+            for team in game_1_probs:
+                sum = 0
+                for opp in game_2_probs:
+                    sum += (game_1_probs[team]
                         * game_2_probs[opp]
                         * self._model.predict(team.get_name, opp.get_name, 'N'))[1]
-            probs_map[team] = sum
-        # iterate over game 2
-        for team in self.__game2.get_teams():
-            sum = 0
-            for opp in self.__game1.get_teams():
-                sum += (game_2_probs[team]
+                probs_map[team] = sum
+            # iterate over game 2
+            for team in game_2_probs:
+                sum = 0
+                for opp in game_1_probs:
+                    sum += (game_2_probs[team]
                         * game_1_probs[opp]
                         * self._model.predict(team.get_name, opp.get_name, 'N'))[1]
-            probs_map[team] = sum
+                probs_map[team] = sum
 
-        probs_map = self._sort_dict(probs_map)
-        self._cached_probs = probs_map
-        return probs_map
+            self._cached_probs = probs_map
+            
+        return self._cached_probs
+    
+    def get_opt_total_evs(self) -> Dict[Team, Tuple[float, Team]]:
+        if self._cached_optimal_total_evs is None:
+            probs_map = self.get_probs()
+            # Out of all game 1s, which team has the highest value and what team is it?
+            g1_opt_evs = self.__game1.get_opt_total_evs()
+            g1_opt_team = None
+            g1_opt_val = 0
+            for team in g1_opt_evs:
+                if g1_opt_evs[team][0] > g1_opt_val:
+                    g1_opt_val = g1_opt_evs[team][0]
+                    g1_opt_team = team
+                
+            # Same for game 2
+            g2_opt_evs = self.__game2.get_opt_total_evs()
+            g2_opt_team = None
+            g2_opt_val = 0
+            for team in g2_opt_evs:
+                if g2_opt_evs[team][0] > g2_opt_val:
+                    g2_opt_val = g2_opt_evs[team][0]
+                    g2_opt_team = team
+        
+            opt_ev_map = {}
+            # Over game 1
+            for team in g1_opt_evs:
+                # Value for winning this game plus values for each team up to this game
+                opt_ev_map[team] = (self._get_value(team, self._round)*probs_map[team] + g1_opt_evs[team][0] + g2_opt_val, g2_opt_team)
+            
+            # Over game 2
+            for team in g2_opt_evs:
+                opt_ev_map[team] = (self._get_value(team, self._round)*probs_map[team] + g2_opt_evs[team][0] + g1_opt_val, g1_opt_team)
+                
+            self._cached_optimal_total_evs = opt_ev_map
+            
+        return self._cached_optimal_total_evs
 
-    def get_games(self) -> Set[Game]:
-        games1 = self.__game1.get_games()
+    def get_games(self) -> Dict[int, List[Game]]:
+        games = self.__game1.get_games()
         games2 = self.__game2.get_games()
-        return games1 | games2 | {self}
+        for round in games.keys():
+            games[round] += games2[round]
+        games[self._round] = [self]
+        return games
 
-    def get_teams(self) -> list[Team]:
-        return self.__game1.get_teams() + self.__game2.get_teams()
-
-class Sentinel(Game):
-    """
-    A Sentinel is a dummy Game whose only purpose is to act as a parent for the championship game (canonical root of the
-    bracket tree).
-
-    Sentinels may not have parents, and they do not have any way to calculate their own probabilities.
-
-    Attributes:
-        _model: A Model object responsible for calculating win probabilities for the game.
-        _round: An integer representing the round of the game.
-        _parent: A Game object that is the parent of this Game object.
-        _cached_probs: A dict object that is the output of self.get_probs(), useful for preventing duplicate computations.
-        _cached_expected_vals: A dict object that is the output of self.get_expected_vals(), useful for preventing
-        duplicate computations.
-        __game: the championship Game of the tournament.
-    """
-
-    def __init__(self, game: Game):
-        """
-        Constructs a Sentinel object with the given Game.
-
-        Args:
-            game (Game): the championship Game (root) of the bracket.
-        """
-        # NOTE: super deliberately not called because model and round are useless for sentinels and don't need
-        # to be initialized
-        self.__game = game
-        self.__game._add_parent(self)
-
-    # raises a RuntimeError because Sentinels cannot have parents
-    def _add_parent(self, parent: Game) -> None:
-        raise RuntimeError("Cannot add parent to sentinel")
-
-    # simply raises a RuntimeError because Sentinels cannot calculate probabilities
-    def get_probs(self) -> dict[Team, float]:
-        raise RuntimeError("Cannot calculate probs for sentinel")
-
-    # simply produces a dict from each team in the sentinel to 0, which is useful for acting as a stopping point for
-    # get_expected_values calculations in canonical games
-    def get_expected_values(self) -> dict[Team, float]:
-        values_dict = dict.fromkeys(self.get_teams(), 0)
-        return values_dict
-
-    # produces all games in this Sentinel, not including this Sentinel.
-    def get_games(self) -> Set[Game]:
-        return self.__game.get_games()
-
-    # produces all teams in this Sentinel.
-    def get_teams(self) -> list[Team]:
-        return self.__game.get_teams()
+    def _initialize_teams(self) -> None:
+        self._teams = self.__game1.get_teams | self.__game2.get_teams
+    
+    def get_child_games(self) -> Tuple[Team]:
+        """Returns the first and second game in this UpperGame."""
+        return self.__game1, self.__game2

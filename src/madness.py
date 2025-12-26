@@ -1,8 +1,6 @@
-from src.bracket import BaseGame
-from src.bracket import Sentinel
-from src.bracket import Team
-from src.bracket import UpperGame
-from src.model import LogisticRegression, MLP
+from bracket import BaseGame, Team, UpperGame
+from model import LogisticRegression, MLP
+from optimize import find_max_bracket
 
 # using seeding predictions from ESPN bracketology as of 12/24/24
 
@@ -10,108 +8,111 @@ from src.model import LogisticRegression, MLP
 
 # south
 south111 = Team("Auburn", 1)
-south112 = Team("Merrimack", 16)
+south112 = Team("Alabama St.", 16)
 
-south121 = Team("North Carolina", 8)
-south122 = Team("Michigan", 9)
+south121 = Team("Louisville", 8)
+south122 = Team("Creighton", 9)
 
-south131 = Team("Dayton", 5)
-south132 = Team("Liberty", 12)
+south131 = Team("Michigan", 5)
+south132 = Team("UC San Diego", 12)
 
-south141 = Team("West Virginia", 4)
-south142 = Team("Arkansas St.", 13)
+south141 = Team("Texas A&M", 4)
+south142 = Team("Yale", 13)
 
-south151 = Team("UCLA", 6)
-south152 = Team("Drake", 11)
+south151 = Team("Mississippi", 6)
+south152 = Team("Xavier", 11)
 
-south161 = Team("Alabama", 3)
-south162 = Team("Elon", 14)
+south161 = Team("Iowa St.", 3)
+south162 = Team("Lipscomb", 14)
 
-south171 = Team("Michigan St.", 7)
-south172 = Team("Missouri", 10)
+south171 = Team("Marquette", 7)
+south172 = Team("New Mexico", 10)
 
-south181 = Team("Marquette", 2)
-south182 = Team("Milwaukee", 15)
+south181 = Team("Michigan St.", 2)
+south182 = Team("Bryant", 15)
 
 # west
-west111 = Team("Duke", 1)
-west112 = Team("Little Rock", 16)
+west111 = Team("Florida", 1)
+west112 = Team("Norfolk St.", 16)
 
-west121 = Team("Maryland", 8)
-west122 = Team("Arkansas", 9)
+west121 = Team("Connecticut", 8)
+west122 = Team("Oklahoma", 9)
 
-west131 = Team("Mississippi St.", 5)
-west132 = Team("Utah St.", 12)
+west131 = Team("Memphis", 5)
+west132 = Team("Colorado St.", 12)
 
-west141 = Team("Gonzaga", 4)
-west142 = Team("North Dakota St.", 13)
+west141 = Team("Maryland", 4)
+west142 = Team("Grand Canyon", 13)
 
-west151 = Team("Baylor", 6)
-west152 = Team("Ohio St.", 11)
+west151 = Team("Missouri", 6)
+west152 = Team("Drake", 11)
 
-west161 = Team("Texas A&M", 3)
-west162 = Team("Grand Canyon", 14)
+west161 = Team("Texas Tech", 3)
+west162 = Team("UNC Wilmington", 14)
 
-west171 = Team("Arizona St.", 7)
-west172 = Team("Wisconsin", 10)
+west171 = Team("Kansas", 7)
+west172 = Team("Arkansas", 10)
 
-west181 = Team("Oregon", 2)
-west182 = Team("Montana St.", 15)
+west181 = Team("St. John's", 2)
+west182 = Team("Nebraska Omaha", 15)
 
 #midwest
-midwest111 = Team("Tennessee", 1)
-midwest112 = Team("Southern", 16)
+midwest111 = Team("Duke", 1)
+midwest112 = Team("American", 16)
 
-midwest121 = Team("Colorado", 8)
-midwest122 = Team("Louisville", 9)
+midwest121 = Team("Mississippi St.", 8)
+midwest122 = Team("Baylor", 9)
 
-midwest131 = Team("Connecticut", 5)
-midwest132 = Team("UC Irvine", 12)
+midwest131 = Team("Oregon", 5)
+midwest132 = Team("Liberty", 12)
 
-midwest141 = Team("Memphis", 4)
-midwest142 = Team("Columbia", 13)
+midwest141 = Team("Arizona", 4)
+midwest142 = Team("Akron", 13)
 
-midwest151 = Team("Clemson", 6)
-midwest152 = Team("Northwestern", 11)
+midwest151 = Team("BYU", 6)
+midwest152 = Team("VCU", 11)
 
-midwest161 = Team("Florida", 3)
-midwest162 = Team("Central Connecticut", 14)
+midwest161 = Team("Wisconsin", 3)
+midwest162 = Team("Montana", 14)
 
-midwest171 = Team("San Diego St.", 7)
-midwest172 = Team("Nebraska", 10)
+midwest171 = Team("Saint Mary's", 7)
+midwest172 = Team("Vanderbilt", 10)
 
-midwest181 = Team("Kansas", 2)
-midwest182 = Team("Lipscomb", 15)
+midwest181 = Team("Alabama", 2)
+midwest182 = Team("Robert Morris", 15)
 
 #east
 
-east111 = Team("Iowa St.", 1)
-east112 = Team("Bryant", 16)
+east111 = Team("Houston", 1)
+east112 = Team("SIU Edwardsville", 16)
 
-east121 = Team("Illinois", 8)
-east122 = Team("Mississippi", 9)
+east121 = Team("Gonzaga", 8)
+east122 = Team("Georgia", 9)
 
-east131 = Team("Pittsburgh", 5)
-east132 = Team("Furman", 12)
+east131 = Team("Clemson", 5)
+east132 = Team("McNeese St.", 12)
 
-east141 = Team("Oklahoma", 4)
-east142 = Team("McNeese St.", 13)
+east141 = Team("Purdue", 4)
+east142 = Team("High Point", 13)
 
-east151 = Team("Georgia", 6)
-east152 = Team("UCF", 11)
+east151 = Team("Illinois", 6)
+east152 = Team("North Carolina", 11)
 
-east161 = Team("Purdue", 3)
-east162 = Team("Kent St.", 14)
+east161 = Team("Kentucky", 3)
+east162 = Team("Troy", 14)
 
-east171 = Team("Houston", 7)
-east172 = Team("Penn St.", 10)
+east171 = Team("UCLA", 7)
+east172 = Team("Utah St.", 10)
 
-east181 = Team("Kentucky", 2)
-east182 = Team("High Point", 15)
+east181 = Team("Tennessee", 2)
+east182 = Team("Wofford", 15)
 
 # init model and train
-model = MLP(2025, n_hidden=1, lr=0.00003, width_hidden=32, dropout=0.1)
-model.train(epochs=10000, lambda_=2)
+#model = MLP(2025, n_hidden=2, lr=0.00003, width_hidden=32, dropout=0)
+#model.train(epochs=300, lambda_=5)
+model = LogisticRegression(2025, lr=0.0001)
+model.train()
+print(model.predict("Auburn", "Oklahoma", "N"))
 print("Accuracy for 2024 season:",model.accuracy(year=2024))
 
 # init games
@@ -233,21 +234,8 @@ right = UpperGame(model, 5, midwest41, east41)
 # round 6 game
 championship = UpperGame(model, 6, left, right)
 
-# init sentinel
-sentinel = Sentinel(championship)
-
-# get expected vals
-games = championship.get_games()
-winners = {}
-for round in games.keys():
-    winners[round] = []
-    for game in games[round]:
-        i = -1
-        evs = game.get_expected_values()
-        while round != 1 and not list(evs.keys())[i].get_name in winners[round - 1]:
-            i -= 1
-        winners[round].append(list(evs.keys())[i].get_name)
-
-for round in winners.keys():
-    print("Round: {}".format(round))
-    print("Winners: {}".format(winners[round]))
+opt_bracket, total = find_max_bracket(championship)
+for round in range(1, 7):
+    print(f"Round {round} winners: {[t.get_name for t in opt_bracket[round]]}")
+    
+print(f"Total expected points: {total}")
