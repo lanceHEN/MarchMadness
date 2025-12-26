@@ -187,8 +187,9 @@ class Model(ABC):
         alphas = self._project(x.T) # 1, projected_dim
         # probability of winning and losing
         phi = np.hstack((alphas, np.ones((alphas.shape[0],1))))
-        q1 = self._forward(phi)
+        q1 = self._forward(phi).item()
         q0 = 1 - q1
+        #print(q1)
         return np.array([q0, q1])
 
     @staticmethod
@@ -247,7 +248,10 @@ class LogisticRegression(Model):
         print("Model trained!")
 
     def _forward(self, phi):
+        #print(phi)
+        #print(self.__w)
         q1 = self._sigmoid(phi.dot(self.__w))
+        #print(q1)
         return q1
 
     def accuracy(self, year):
