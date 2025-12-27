@@ -15,7 +15,7 @@ def find_max_bracket(championship: Game) -> Tuple[Dict[int, List[Team]], float]:
     Returns:
         """
     mapping = {r: [] for r in range(1, championship.get_round + 1)}
-    total = 0
+    
     
     root_opt_evs = championship.get_opt_total_evs()
     max_team = None
@@ -26,13 +26,11 @@ def find_max_bracket(championship: Game) -> Tuple[Dict[int, List[Team]], float]:
             max_team = team
             
     def rebuild_bracket(game, winning_team):
-        nonlocal total
-        
+
         round = game.get_round
         mapping[round].append(winning_team)
         
         opt_evs = game.get_opt_total_evs()
-        total += opt_evs[winning_team][0]
         losing_team = opt_evs[winning_team][1]
         if isinstance(game, UpperGame):
             game1, game2 = game.get_child_games()
@@ -45,4 +43,4 @@ def find_max_bracket(championship: Game) -> Tuple[Dict[int, List[Team]], float]:
                 rebuild_bracket(game2, winning_team)
             
     rebuild_bracket(championship, max_team)
-    return mapping, total
+    return mapping, max_opt_ev
