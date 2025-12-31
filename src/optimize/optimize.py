@@ -1,6 +1,6 @@
 from typing import Dict, List, Tuple
 
-from bracket import Game, Team, UpperGame
+from bracket.bracket import Game, Team, UpperGame
 
 """This module provides functions for finding an optimal March Madness bracket."""
 
@@ -15,6 +15,7 @@ def find_max_bracket(championship: Game) -> Tuple[Dict[int, List[Team]], float]:
         championship (Game): The championship game.
 
     Returns:
+        Tuple[Dict[int, List[Team]], float]: Optimal bracket and objective value.
     """
     mapping = {r: [] for r in range(1, championship.get_round + 1)}
 
@@ -27,7 +28,7 @@ def find_max_bracket(championship: Game) -> Tuple[Dict[int, List[Team]], float]:
             max_team = team
 
     def rebuild_bracket(game, winning_team):
-
+        """Recursively builds optimal bracket from root."""
         round = game.get_round
         mapping[round].append(winning_team)
 
