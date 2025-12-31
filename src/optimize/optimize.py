@@ -1,6 +1,6 @@
 from typing import Dict, List, Tuple
 
-from bracket.bracket import Game, Team, UpperGame
+from bracket import Game, Team, UpperGame
 
 """This module provides functions for finding an optimal March Madness bracket."""
 

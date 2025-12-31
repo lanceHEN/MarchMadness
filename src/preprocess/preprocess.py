@@ -2,9 +2,9 @@ import numpy as np
 import pandas as pd
 from sklearn import preprocessing
 
-res_map = {"W": 1, "L": 0}  # map categorical to numeric
-ven_map = {"H": 1, "N": 0, "A": -1}
-stats_columns = [
+RES_MAP = {"W": 1, "L": 0}  # map categorical to numeric
+VEN_MAP = {"H": 1, "N": 0, "A": -1}
+STATS_COLUMNS = [
     "AdjO",
     "AdjD",
     "OffEfg%",
@@ -69,12 +69,12 @@ def get_data(year):
     df.insert(6, "Home Score", result_split[1].astype(int))
     df.insert(6, "Win", result_split[0])
     # convert result to binary: 1 for W, 0 for L
-    df["Win"] = df["Win"].apply(lambda x: res_map[x])
+    df["Win"] = df["Win"].apply(lambda x: RES_MAP[x])
     # convert venue to numerical: 1 for H, 0 for N, -1 for A
-    df["Venue"] = df["Venue"].apply(lambda x: ven_map[x])
+    df["Venue"] = df["Venue"].apply(lambda x: VEN_MAP[x])
     # get rolling averages
     num_games = 10
-    for stat in stats_columns:
+    for stat in STATS_COLUMNS:
         df[f"Team_{stat}_avg"] = (
             df.groupby("Team")[stat]
             .rolling(num_games, min_periods=1)
@@ -83,7 +83,7 @@ def get_data(year):
             .reset_index(level=0, drop=True)
         )
     # Compute rolling averages for the opponent
-    for stat in stats_columns:
+    for stat in STATS_COLUMNS:
         df[f"Opponent_{stat}_avg"] = (
             df.groupby("Opp")[stat]
             .rolling(5, min_periods=1)
@@ -93,7 +93,7 @@ def get_data(year):
         )
     df.dropna(inplace=True)
     # get stat differentials
-    for stat in stats_columns:
+    for stat in STATS_COLUMNS:
         df[f"{stat}_diff"] = df[f"Team_{stat}_avg"] - df[f"Opponent_{stat}_avg"]
     features = [
         "Venue",

@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Dict, List, Set, Tuple
 
-from model.model import Model
+from model import Model
 
 """
 The bracket module contains classes that make up a tree-like bracket of the March Madness tournament.

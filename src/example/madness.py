@@ -2,7 +2,7 @@ from bracket import BaseGame, Team, UpperGame
 from model import MLP, LogisticRegression
 from optimize import find_max_bracket
 
-# using seeding predictions from ESPN bracketology as of 12/24/24
+"""ADD STUFF"""
 
 # init teams
 
