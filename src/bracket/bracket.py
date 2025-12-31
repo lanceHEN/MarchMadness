@@ -216,7 +216,7 @@ class Game(ABC):
         pass
 
     @property
-    def get_teams(self) -> Set[Team]:
+    def teams(self) -> Set[Team]:
         """
         Produces a set of all teams contained in this Game.
         """
@@ -230,7 +230,7 @@ class Game(ABC):
         pass
 
     @property
-    def get_round(self) -> int:
+    def round(self) -> int:
         """
         Produces the round of this Game.
 
@@ -361,7 +361,7 @@ class UpperGame(Game):
 
     def get_probs(self) -> Dict[Team, float]:
         if self._cached_probs is None:
-            probs_map = dict.fromkeys(self.get_teams)
+            probs_map = dict.fromkeys(self.teams)
             game_1_probs = self._game1.get_probs()
             game_2_probs = self._game2.get_probs()
             # iterate over game 1
@@ -443,16 +443,22 @@ class UpperGame(Game):
         return games
 
     def _initialize_teams(self) -> None:
-        self._teams = self._game1.get_teams | self._game2.get_teams
+        self._teams = self._game1.teams | self._game2.teams
 
     def get_child_games(self) -> Tuple[Team]:
         """Returns the first and second game in this UpperGame."""
         return self._game1, self._game2
 
-
-def make_bracket_from_teams(model: Model, teams: Iterable[Tuple[str, int]]) -> Game:
+def make_team_list(team_tuples: Iterable[Tuple[str, int]]) -> List[Team]:
     """
-    Given a model and iterable of 2^k teams, where k is a positive number, produces
+    Given an iterable of (team_name, team_seed) tuples, produces a list
+    of Teams from them.
+    """
+    return [Team(name, seed) for name, seed in team_tuples]
+
+def make_bracket_from_teams(model: Model, teams: List[Team]) -> Game:
+    """
+    Given a model and list of 2^k teams, where k is a positive number, produces
     the root (championship game) of a symmetric bracket. The bracket is made
     such that every 2 team in teams, left to right, are paired against each
     other in the first round, then in any subsequent round each 2 winners
@@ -460,14 +466,11 @@ def make_bracket_from_teams(model: Model, teams: Iterable[Tuple[str, int]]) -> G
 
     Args:
         model (Model): Model to get probability calculations from.
-        teams (Iterable[Tuple[str, int]]): List of teams for the bracket.
+        teams (List[Team]): List of teams for the bracket.
 
     Returns:
         Game: Root node of the bracket, i.e. the championship game.
     """
-    # Convert to list of Teams
-    teams = [Team(name, seed) for name, seed in teams]
-
     # Set up first round
     prev_round_games = [
         BaseGame(Model, 1, teams[i], teams[i + 1]) for i in range(len(teams))

@@ -17,7 +17,7 @@ def find_max_bracket(championship: Game) -> Tuple[Dict[int, List[Team]], float]:
     Returns:
         Tuple[Dict[int, List[Team]], float]: Optimal bracket and objective value.
     """
-    mapping = {r: [] for r in range(1, championship.get_round + 1)}
+    mapping = {r: [] for r in range(1, championship.round + 1)}
 
     root_opt_evs = championship.get_opt_total_evs()
     max_team = None
@@ -29,7 +29,7 @@ def find_max_bracket(championship: Game) -> Tuple[Dict[int, List[Team]], float]:
 
     def rebuild_bracket(game, winning_team):
         """Recursively builds optimal bracket from root."""
-        round = game.get_round
+        round = game.round
         mapping[round].append(winning_team)
 
         opt_evs = game.get_opt_total_evs()
@@ -37,7 +37,7 @@ def find_max_bracket(championship: Game) -> Tuple[Dict[int, List[Team]], float]:
         if isinstance(game, UpperGame):
             game1, game2 = game.get_child_games()
             # How do we know which game the winner and loser belongs to?
-            if winning_team in game1.get_teams:
+            if winning_team in game1.teams:
                 rebuild_bracket(game1, winning_team)
                 rebuild_bracket(game2, losing_team)
             else:  # Always game1 first, game2 second
