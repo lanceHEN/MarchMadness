@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Dict, List, Set, Tuple
+from typing import Dict, List, Set, Tuple, Iterable
 
 from model import Model
 
@@ -448,3 +448,40 @@ class UpperGame(Game):
     def get_child_games(self) -> Tuple[Team]:
         """Returns the first and second game in this UpperGame."""
         return self._game1, self._game2
+
+
+def make_bracket_from_teams(model: Model, teams: Iterable[Tuple[str, int]]) -> Game:
+    """
+    Given a model and iterable of 2^k teams, where k is a positive number, produces
+    the root (championship game) of a symmetric bracket. The bracket is made
+    such that every 2 team in teams, left to right, are paired against each
+    other in the first round, then in any subsequent round each 2 winners
+    from the previous round, left to right, are paired against each other.
+
+    Args:
+        model (Model): Model to get probability calculations from.
+        teams (Iterable[Tuple[str, int]]): List of teams for the bracket.
+
+    Returns:
+        Game: Root node of the bracket, i.e. the championship game.
+    """
+    # Convert to list of Teams
+    teams = [Team(name, seed) for name, seed in teams]
+
+    # Set up first round
+    prev_round_games = [
+        BaseGame(Model, 1, teams[i], teams[i + 1]) for i in range(len(teams))
+    ]
+
+    # Set up other rounds
+    round = 2
+    while len(prev_round_games) > 1:
+        prev_round_games = [
+            UpperGame(Model, round, prev_round_games[i], prev_round_games[i + 1])
+            for i in range(len(prev_round_games))
+        ]
+        round += 1
+
+    # Get reference to championship game
+    championship = prev_round_games[0]
+    return championship
