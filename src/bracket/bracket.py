@@ -66,7 +66,7 @@ class Team:
         self._seed = seed
 
     @property
-    def get_name(self) -> str:
+    def name(self) -> str:
         """
         Produces the name of the Team as a string.
 
@@ -76,7 +76,7 @@ class Team:
         return self._name
 
     @property
-    def get_seed(self) -> int:
+    def seed(self) -> int:
         """
         Produces the seed of the Team as an integer.
 
@@ -97,7 +97,7 @@ class Team:
         """
         if not isinstance(other, Team):
             return False
-        return self.get_name == other.get_name and self.get_seed == other.get_seed
+        return self.name == other.name and self.seed == other.seed
 
     def __hash__(self) -> int:
         """
@@ -242,7 +242,7 @@ class Game(ABC):
     @staticmethod
     def _get_value(team: Team, round: int):
         """Produces the value for the team winning the given round, given by seed*2^(round-1)."""
-        return team.get_seed * 2 ** (round - 1)
+        return team.seed * 2 ** (round - 1)
 
 
 class BaseGame(Game):
@@ -288,7 +288,7 @@ class BaseGame(Game):
     def get_probs(self) -> Dict[Team, float]:
         if self._cached_probs is None:
             team_1_prediction = self._model.predict(
-                self._team1.get_name, self._team2.get_name, "N"
+                self._team1.name, self._team2.name, "N"
             )[1]
             team_2_prediction = 1 - team_1_prediction
             self._cached_probs = {
@@ -371,7 +371,7 @@ class UpperGame(Game):
                     sum += (
                         game_1_probs[team]
                         * game_2_probs[opp]
-                        * self._model.predict(team.get_name, opp.get_name, "N")
+                        * self._model.predict(team.name, opp.name, "N")
                     )[1]
                 probs_map[team] = sum
             # iterate over game 2
@@ -381,7 +381,7 @@ class UpperGame(Game):
                     sum += (
                         game_2_probs[team]
                         * game_1_probs[opp]
-                        * self._model.predict(team.get_name, opp.get_name, "N")
+                        * self._model.predict(team.name, opp.name, "N")
                     )[1]
                 probs_map[team] = sum
 
