@@ -1,5 +1,5 @@
 from bracket import BaseGame, Team, UpperGame
-from model import LogisticRegression, MLP
+from model import MLP, LogisticRegression
 from optimize import find_max_bracket
 
 # using seeding predictions from ESPN bracketology as of 12/24/24
@@ -56,7 +56,7 @@ west172 = Team("Arkansas", 10)
 west181 = Team("St. John's", 2)
 west182 = Team("Nebraska Omaha", 15)
 
-#midwest
+# midwest
 midwest111 = Team("Duke", 1)
 midwest112 = Team("American", 16)
 
@@ -81,7 +81,7 @@ midwest172 = Team("Vanderbilt", 10)
 midwest181 = Team("Alabama", 2)
 midwest182 = Team("Robert Morris", 15)
 
-#east
+# east
 
 east111 = Team("Houston", 1)
 east112 = Team("SIU Edwardsville", 16)
@@ -108,12 +108,12 @@ east181 = Team("Tennessee", 2)
 east182 = Team("Wofford", 15)
 
 # init model and train
-#model = MLP(2025, n_hidden=2, lr=0.00003, width_hidden=32, dropout=0)
-#model.train(epochs=300, lambda_=5)
+# model = MLP(2025, n_hidden=2, lr=0.00003, width_hidden=32, dropout=0)
+# model.train(epochs=300, lambda_=5)
 model = LogisticRegression(2025, lr=0.0001)
 model.train()
 print(model.predict("Auburn", "Oklahoma", "N"))
-print("Accuracy for 2024 season:",model.accuracy(year=2024))
+print("Accuracy for 2024 season:", model.accuracy(year=2024))
 
 # init games
 # south
@@ -142,7 +142,7 @@ west16 = BaseGame(model, 1, west161, west162)
 west17 = BaseGame(model, 1, west171, west172)
 west18 = BaseGame(model, 1, west181, west182)
 
-#midwest
+# midwest
 midwest11 = BaseGame(model, 1, midwest111, midwest112)
 midwest12 = BaseGame(model, 1, midwest121, midwest122)
 
@@ -168,7 +168,7 @@ east16 = BaseGame(model, 1, east161, east162)
 east17 = BaseGame(model, 1, east171, east172)
 east18 = BaseGame(model, 1, east181, east182)
 
-#round 2 games
+# round 2 games
 # south
 south21 = UpperGame(model, 2, south11, south12)
 south22 = UpperGame(model, 2, south13, south14)
@@ -202,7 +202,7 @@ east24 = UpperGame(model, 2, east17, east18)
 south31 = UpperGame(model, 3, south21, south22)
 south32 = UpperGame(model, 3, south23, south24)
 
-#west
+# west
 west31 = UpperGame(model, 3, west21, west22)
 west32 = UpperGame(model, 3, west23, west24)
 
@@ -237,5 +237,6 @@ championship = UpperGame(model, 6, left, right)
 opt_bracket, total = find_max_bracket(championship)
 for round in range(1, 7):
     print(f"Round {round} winners: {[t.get_name for t in opt_bracket[round]]}")
-    
+
 print(f"Total expected points: {total}")
+# print(championship.get_opt_total_evs())

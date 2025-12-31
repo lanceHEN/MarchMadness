@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
+from typing import Dict, List, Set, Tuple
+
 from model import Model
-from typing import Set, List, Dict, Tuple
 
 """
 The bracket module contains classes that make up a tree-like bracket of the March Madness tournament.
@@ -36,6 +37,7 @@ basegame_1_expected_vals = basegame_1.get_expected_values()
 auburn_ev = basegame_1_expected_vals[auburn]
 
 """
+
 
 class Team:
     """
@@ -106,6 +108,7 @@ class Team:
         """
         return hash((self.__name, self.__seed))
 
+
 class Game(ABC):
     """
     A particular matchup in the March Madness tournament.
@@ -140,7 +143,7 @@ class Game(ABC):
             ValueError: If round is not a positive integer.
         """
         if round <= 0:
-            raise ValueError('round must be a positive integer')
+            raise ValueError("round must be a positive integer")
         self._model = model
         self._round = round
         self._initialize_teams()
@@ -152,9 +155,9 @@ class Game(ABC):
         """
         Determines the probability of each possible team in this Game winning this game and any previous games, producing
         a dict from such teams to their probabilities.
-        
+
         EFFECT: Caches result to self._cached_probs.
-        
+
         Note because of the tree structure, each game should only have get_probs called once in the recursive tree, so
         the caching is less for expediting the initial call and more for convenience in case it happens to be called again
         (e.g. in get_expected_values).
@@ -181,27 +184,27 @@ class Game(ABC):
             evs_map[team] = evs_map[team] * Game._get_value(team, self._round)
 
         return evs_map
-    
+
     @abstractmethod
     def get_opt_total_evs(self) -> Dict[Team, Tuple[float, Team]]:
         """
         For each team in this game, finds the optimal total expected value for the bracket subtree
         rooted at this game in the case that team wins this game (and therefore qualifies for it).
         Also returns the losing team for reference (None if it's a base game).
-        
+
         This is a dynamic programming approach to allow one to find a globally optimal valid
         bracket that maximizes expected values. The bracket can be reconstructed by picking
         the team with the highest total e.v. for the championship, and reconstructing the bracket
         using get_opt_total_evs, called on that team and the losing team, in the child games.
-        
+
         Returns:
             Dict[Team, Tuple[float, Team]]: Mapping from each team to their optimal total expected
                 points, and the losing team in the optimal configuration.
         """
         pass
-        
+
     @abstractmethod
-    def get_games(self) -> Dict[int, List['Game']]:
+    def get_games(self) -> Dict[int, List["Game"]]:
         """
         Produces a dict from round to its corresponding Games, for each Game contained in this Game object
          (including itself).
@@ -218,7 +221,7 @@ class Game(ABC):
         Produces a set of all teams contained in this Game.
         """
         return self._teams
-    
+
     @abstractmethod
     def _initialize_teams(self) -> None:
         """
@@ -239,7 +242,8 @@ class Game(ABC):
     @staticmethod
     def _get_value(team: Team, round: int):
         """Produces the value for the team winning the given round, given by seed*2^(round-1)."""
-        return team.get_seed * 2**(round - 1)
+        return team.get_seed * 2 ** (round - 1)
+
 
 class BaseGame(Game):
     """
@@ -276,35 +280,44 @@ class BaseGame(Game):
         """
         self.__team1 = team1
         self.__team2 = team2
-        
+
         # Have to call this AFTER team1 and team2 are initialized or else an error will raise when trying to initialize
         # self._teams
         super().__init__(model, round)
 
     def get_probs(self) -> Dict[Team, float]:
         if self._cached_probs is None:
-            team_1_prediction = self._model.predict(self.__team1.get_name, self.__team2.get_name, 'N')[1]
+            team_1_prediction = self._model.predict(
+                self.__team1.get_name, self.__team2.get_name, "N"
+            )[1]
             team_2_prediction = 1 - team_1_prediction
-            self._cached_probs = {self.__team1: team_1_prediction, self.__team2: team_2_prediction}
-            
+            self._cached_probs = {
+                self.__team1: team_1_prediction,
+                self.__team2: team_2_prediction,
+            }
+
         return self._cached_probs
-    
+
     def get_opt_total_evs(self) -> Dict[Team, Tuple[float, Team]]:
         if self._cached_optimal_total_evs is None:
             probs_map = self.get_probs()
             opt_ev_map = {}
             for team in probs_map:
-                opt_ev_map[team] = (self._get_value(team, self._round) * probs_map[team], None)
-                
+                opt_ev_map[team] = (
+                    self._get_value(team, self._round) * probs_map[team],
+                    None,
+                )
+
             self._cached_optimal_total_evs = opt_ev_map
-        
+
         return self._cached_optimal_total_evs
-    
+
     def _initialize_teams(self) -> None:
         self._teams = {self.__team1, self.__team2}
 
     def get_games(self) -> Dict[int, List[Game]]:
         return {self._round: [self]}
+
 
 class UpperGame(Game):
     """
@@ -341,7 +354,7 @@ class UpperGame(Game):
         """
         self.__game1 = game1
         self.__game2 = game2
-        
+
         # Have to call this AFTER game1 and game2 are initialized or else an error will raise when trying to initialize
         # self._teams
         super().__init__(model, round)
@@ -355,23 +368,27 @@ class UpperGame(Game):
             for team in game_1_probs:
                 sum = 0
                 for opp in game_2_probs:
-                    sum += (game_1_probs[team]
+                    sum += (
+                        game_1_probs[team]
                         * game_2_probs[opp]
-                        * self._model.predict(team.get_name, opp.get_name, 'N'))[1]
+                        * self._model.predict(team.get_name, opp.get_name, "N")
+                    )[1]
                 probs_map[team] = sum
             # iterate over game 2
             for team in game_2_probs:
                 sum = 0
                 for opp in game_1_probs:
-                    sum += (game_2_probs[team]
+                    sum += (
+                        game_2_probs[team]
                         * game_1_probs[opp]
-                        * self._model.predict(team.get_name, opp.get_name, 'N'))[1]
+                        * self._model.predict(team.get_name, opp.get_name, "N")
+                    )[1]
                 probs_map[team] = sum
 
             self._cached_probs = probs_map
-            
+
         return self._cached_probs
-    
+
     def get_opt_total_evs(self) -> Dict[Team, Tuple[float, Team]]:
         if self._cached_optimal_total_evs is None:
             probs_map = self.get_probs()
@@ -383,7 +400,7 @@ class UpperGame(Game):
                 if g1_opt_evs[team][0] > g1_opt_val:
                     g1_opt_val = g1_opt_evs[team][0]
                     g1_opt_team = team
-                
+
             # Same for game 2
             g2_opt_evs = self.__game2.get_opt_total_evs()
             g2_opt_team = None
@@ -392,19 +409,29 @@ class UpperGame(Game):
                 if g2_opt_evs[team][0] > g2_opt_val:
                     g2_opt_val = g2_opt_evs[team][0]
                     g2_opt_team = team
-        
+
             opt_ev_map = {}
             # Over game 1
             for team in g1_opt_evs:
                 # Value for winning this game plus values for each team up to this game
-                opt_ev_map[team] = (self._get_value(team, self._round)*probs_map[team] + g1_opt_evs[team][0] + g2_opt_val, g2_opt_team)
-            
+                opt_ev_map[team] = (
+                    self._get_value(team, self._round) * probs_map[team]
+                    + g1_opt_evs[team][0]
+                    + g2_opt_val,
+                    g2_opt_team,
+                )
+
             # Over game 2
             for team in g2_opt_evs:
-                opt_ev_map[team] = (self._get_value(team, self._round)*probs_map[team] + g2_opt_evs[team][0] + g1_opt_val, g1_opt_team)
-                
+                opt_ev_map[team] = (
+                    self._get_value(team, self._round) * probs_map[team]
+                    + g2_opt_evs[team][0]
+                    + g1_opt_val,
+                    g1_opt_team,
+                )
+
             self._cached_optimal_total_evs = opt_ev_map
-            
+
         return self._cached_optimal_total_evs
 
     def get_games(self) -> Dict[int, List[Game]]:
@@ -417,7 +444,7 @@ class UpperGame(Game):
 
     def _initialize_teams(self) -> None:
         self._teams = self.__game1.get_teams | self.__game2.get_teams
-    
+
     def get_child_games(self) -> Tuple[Team]:
         """Returns the first and second game in this UpperGame."""
         return self.__game1, self.__game2
