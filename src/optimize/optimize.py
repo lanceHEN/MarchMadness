@@ -2,7 +2,17 @@ from typing import Dict, List, Tuple
 
 from bracket import Game, Team, UpperGame
 
-"""This module provides functions for finding an optimal March Madness bracket."""
+"""This module provides functions for finding an optimal March Madness bracket.
+
+For example:
+
+# Assume you already have a reference to the championship game node.
+
+# Find optimal bracket!
+opt_bracket, total = find_max_bracket(championship)
+for round in sorted(opt_bracket.keys()):
+    print(f"Round {round} winners: {[t.name for t in opt_bracket[round]]}")
+"""
 
 
 def find_max_bracket(championship: Game) -> Tuple[Dict[int, List[Team]], float]:

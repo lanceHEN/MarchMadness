@@ -2,6 +2,13 @@ import numpy as np
 import pandas as pd
 from sklearn import preprocessing
 
+"""This file contains relevant functions for getting and preprocessing barttorvik
+data.
+
+For example, to get 2024 season data:
+df, X, y = get_data(2024)
+"""
+
 RES_MAP = {"W": 1, "L": 0}  # map categorical to numeric
 VEN_MAP = {"H": 1, "N": 0, "A": -1}
 STATS_COLUMNS = [
