@@ -110,3 +110,6 @@ def main():
         print(f"Round {round} winners: {[t.name for t in opt_bracket[round]]}")
 
     print(f"Total expected points: {total}")
+
+if __name__ == "__main__":
+    main()
