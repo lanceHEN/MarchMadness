@@ -111,5 +111,6 @@ def main():
 
     print(f"Total expected points: {total}")
 
+
 if __name__ == "__main__":
     main()
