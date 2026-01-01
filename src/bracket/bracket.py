@@ -4,7 +4,8 @@ from typing import Dict, List, Set, Tuple, Iterable
 from model import Model
 
 """
-The bracket module contains classes that make up a tree-like bracket of the March Madness tournament.
+The bracket module contains classes that make up a tree-like bracket of the March Madness tournament,
+as well as a few functions to easily make a tree.
 
 The chief purpose of such a tree is to calculate probabilities of different teams making it to different rounds in the
 tournament, as well as their corresponding expected values.
@@ -12,30 +13,29 @@ tournament, as well as their corresponding expected values.
 Typical usage example:
 
 # define teams
-auburn = Team("Auburn", 1)
-lamar = Team("Lamar", 16)
-unc = Team("North Carolina", 8)
-wisconsin = Team("Wisconsin", 9)
+ALL_TEAMS_RAW = [
+        ("Auburn", 1),
+        ("Alabama St.", 16),
+        ("Louisville", 8),
+        ("Creighton", 9),
+]
+
+# Get Team instances
+ALL_TEAMS = make_team_list(ALL_TEAMS_RAW)
 
 # define and train model
-model = MMLogisticRegression('http://barttorvik.com/getgamestats.php?year=2025&csv=1')
+model = LogisticRegression(2025, lr=0.0001)
 model.train()
 
-# define games
-basegame_1 = BaseGame(model, auburn, lamar)
-basegame_2 = BaseGame(model, unc, wisconsin)
-
-championship = UpperGame(model, 2, basegame_1, basegame_2)
+# make bracket and get championship game
+championship = make_bracket_from_teams(model, ALL_TEAMS)
 
 # get probabilities for winning championship
-probs = championship.get_probabilities()
+probs = championship.get_probs()
 
-# get expected values for winning basegame_1
-basegame_1_expected_vals = basegame_1.get_expected_values()
-
-# get expected value for auburn
-auburn_ev = basegame_1_expected_vals[auburn]
-
+# get expected vals for winning first semifinal
+semi = championship.get_games()[championship.round - 1][0]
+semi_evs = semi.get_expected_values()
 """
 
 
@@ -449,12 +449,14 @@ class UpperGame(Game):
         """Returns the first and second game in this UpperGame."""
         return self._game1, self._game2
 
+
 def make_team_list(team_tuples: Iterable[Tuple[str, int]]) -> List[Team]:
     """
     Given an iterable of (team_name, team_seed) tuples, produces a list
     of Teams from them.
     """
     return [Team(name, seed) for name, seed in team_tuples]
+
 
 def make_bracket_from_teams(model: Model, teams: List[Team]) -> Game:
     """
@@ -473,14 +475,14 @@ def make_bracket_from_teams(model: Model, teams: List[Team]) -> Game:
     """
     # Set up first round
     prev_round_games = [
-        BaseGame(Model, 1, teams[i], teams[i + 1]) for i in range(len(teams))
+        BaseGame(model, 1, teams[i], teams[i + 1]) for i in range(len(teams))
     ]
 
     # Set up other rounds
     round = 2
     while len(prev_round_games) > 1:
         prev_round_games = [
-            UpperGame(Model, round, prev_round_games[i], prev_round_games[i + 1])
+            UpperGame(model, round, prev_round_games[i], prev_round_games[i + 1])
             for i in range(len(prev_round_games))
         ]
         round += 1
